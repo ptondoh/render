@@ -17,6 +17,7 @@ from backend.database import (
     ping_database
 )
 from backend.models import HealthCheckResponse, MessageResponse
+from backend.routers import auth as auth_router
 
 # Configuration du logging
 logging.basicConfig(
@@ -103,6 +104,13 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"]
 )
+
+
+# ============================================================================
+# Inclusion des routers
+# ============================================================================
+
+app.include_router(auth_router.router)
 
 
 # ============================================================================
