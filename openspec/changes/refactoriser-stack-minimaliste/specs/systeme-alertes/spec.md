@@ -26,7 +26,7 @@ Le système SHALL calculer automatiquement les alertes basées sur les collectes
 - **WHEN** le système exécute le job planifié quotidien (2h du matin)
 - **THEN** pour chaque produit dans chaque marché :
   - Récupérer le dernier prix validé (dernière collecte validée)
-  - Comparer au prix de référence régional
+  - Comparer au prix de référence départemental
   - Calculer l'écart en pourcentage
   - Assigner un niveau d'alerte selon les seuils
 - **AND** les alertes sont stockées dans la collection `alertes` avec timestamp
@@ -68,7 +68,7 @@ Le système SHALL fournir un tableau de bord centralisé des alertes.
 
 #### Scenario: Filtrage des alertes
 - **WHEN** un utilisateur filtre les alertes
-- **THEN** des filtres sont disponibles : niveau, région, département, produit, type d'alerte
+- **THEN** des filtres sont disponibles : niveau, département, commune, marché, produit, type d'alerte
 - **AND** les filtres sont cumulables (ET logique)
 - **AND** le nombre de résultats est affiché en temps réel
 
@@ -130,15 +130,15 @@ Le système SHALL permettre aux administrateurs de configurer les seuils d'alert
   - Surveillance : + 15%
   - Alerte : + 30%
   - Urgence : + 50%
-- **AND** ces seuils s'appliquent à tous les produits et toutes les régions sauf override
+- **AND** ces seuils s'appliquent à tous les produits et tous les départements sauf override
 
 #### Scenario: Seuils spécifiques par produit
 - **WHEN** un administrateur configure un produit sensible (ex: riz)
 - **THEN** il peut définir des seuils spécifiques plus stricts (ex: Surveillance à +10%)
 - **AND** les seuils spécifiques ont priorité sur les seuils globaux
 
-#### Scenario: Seuils spécifiques par région
-- **WHEN** une région a une volatilité des prix particulière
-- **THEN** un administrateur peut définir des seuils régionaux adaptés
-- **AND** les seuils régionaux ont priorité sur les seuils produits et globaux
-- **AND** l'ordre de priorité est : région+produit > région > produit > global
+#### Scenario: Seuils spécifiques par département
+- **WHEN** un département a une volatilité des prix particulière
+- **THEN** un administrateur peut définir des seuils départementaux adaptés
+- **AND** les seuils départementaux ont priorité sur les seuils produits et globaux
+- **AND** l'ordre de priorité est : département+produit > département > produit > global

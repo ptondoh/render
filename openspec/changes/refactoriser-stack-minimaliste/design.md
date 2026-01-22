@@ -11,7 +11,7 @@ Le Système d'Alerte Précoce (SAP) doit fonctionner dans un environnement contr
 **Contraintes principales :**
 - Mode hors-ligne obligatoire pour la collecte terrain
 - Authentification multi-facteurs (MFA) requise
-- Support de la hiérarchie territoriale complexe (Région > Département > Commune > Marché)
+- Support de la hiérarchie territoriale (Département > Commune > Marché)
 - Journalisation d'audit exhaustive
 
 **Parties prenantes :**
@@ -114,7 +114,7 @@ backend/
 
 **Justification :**
 - **Schéma flexible** : Évolution facile entre phases (0→4) sans migrations lourdes
-- **Hiérarchie** : Documents imbriqués naturels pour Région>Département>Commune
+- **Hiérarchie** : Documents imbriqués naturels pour Département>Commune>Marché
 - **Performance** : Indexation rapide, agrégations puissantes pour rapports
 - **Réplication** : Support natif pour déploiements distribués (multi-sites futurs)
 - **JSON natif** : Pas de mapping ORM, direct de l'API au client

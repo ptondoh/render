@@ -67,7 +67,7 @@ app = FastAPI(
 
     * **Authentification** - Gestion des utilisateurs avec MFA
     * **Collecte de prix** - Collecte de prix sur les marchés (mode hors-ligne supporté)
-    * **Hiérarchie territoriale** - Gestion Région > Département > Commune > Marché
+    * **Hiérarchie territoriale** - Gestion Département > Commune > Marché
     * **Produits** - Référentiel des produits alimentaires
     * **Alertes** - Système d'alertes à 4 niveaux (Normal, Surveillance, Alerte, Urgence)
 

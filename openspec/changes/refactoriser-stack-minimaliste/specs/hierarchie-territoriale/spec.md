@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Modèle de Hiérarchie à 4 Niveaux
-Le système SHALL gérer une hiérarchie territoriale complète : Région > Département > Commune > Marché.
+Le système SHALL gérer une hiérarchie territoriale complète : Département > Commune > Marché.
 
 #### Scenario: Structure hiérarchique imbriquée
 - **WHEN** un administrateur consulte la structure territoriale
@@ -11,43 +11,27 @@ Le système SHALL gérer une hiérarchie territoriale complète : Région > Dép
 - **AND** chaque niveau contient : code unique, nom, niveau supérieur (parent)
 - **AND** un marché appartient obligatoirement à une commune
 - **AND** une commune appartient obligatoirement à un département
-- **AND** un département appartient obligatoirement à une région
 
 #### Scenario: Codes uniques par niveau
 - **WHEN** une nouvelle entité territoriale est créée
-- **THEN** un code unique est assigné selon la convention :
-  - Région : REG-XX (ex: REG-01, REG-02)
-  - Département : DEP-XXX (ex: DEP-001, DEP-002)
-  - Commune : COM-XXXXX (ex: COM-00001)
-  - Marché : MAR-XXXXXX (ex: MAR-000001)
-- **AND** les codes sont auto-générés et non modifiables
-
-### Requirement: Gestion des Régions
-Le système SHALL permettre la création et gestion des régions.
-
-#### Scenario: Création d'une région
-- **WHEN** un administrateur crée une nouvelle région
-- **THEN** les champs obligatoires sont : nom, coordonnées géographiques (latitude/longitude du centre)
-- **AND** un code REG-XX est généré automatiquement
-- **AND** la région peut contenir des métadonnées optionnelles (superficie, population)
-
-#### Scenario: Liste des régions
-- **WHEN** un utilisateur accède à la liste des régions
-- **THEN** toutes les régions actives sont affichées
-- **AND** pour chaque région : code, nom, nombre de départements, nombre de marchés
-- **AND** les régions sont triables par nom ou code
+- **THEN** un identifiant numerique incrementale unique est assigne a Département,  Commune, Marché.
+  - un code unique non obligatoire est assigné selon la convention local:
+    - Département  (ex: DEP-001, DEP-002)
+    - Commune  (ex: COM-00001)
+    - Marché (ex: MAR-000001)
+- **AND** les codes sont auto-générés et modifiables
 
 ### Requirement: Gestion des Départements
 Le système SHALL permettre la création et gestion des départements.
 
 #### Scenario: Création d'un département
 - **WHEN** un administrateur crée un nouveau département
-- **THEN** les champs obligatoires sont : nom, région parente
+- **THEN** les champs obligatoires sont : nom
 - **AND** un code DEP-XXX est généré automatiquement
-- **AND** le département hérite automatiquement de certaines propriétés de sa région
+- **AND** coordonnées géographiques (latitude/longitude du centre) non obligatoire
 
-#### Scenario: Réaffectation de département
-- **WHEN** un administrateur change la région parente d'un département
+#### Scenario: Modification de département
+- **WHEN** un administrateur change le nom du département
 - **THEN** toutes les communes du département suivent le changement
 - **AND** tous les marchés des communes sont réaffectés en cascade
 - **AND** un log d'audit enregistre le changement avec justification
@@ -63,7 +47,7 @@ Le système SHALL permettre la création et gestion des communes.
 
 #### Scenario: Communes multiples avec même nom
 - **WHEN** plusieurs communes portent le même nom dans des départements différents
-- **THEN** le système les distingue par leur code unique
+- **THEN** le système les distingue par leur identifiant et code unique
 - **AND** l'affichage inclut le département pour clarté (ex: "Port-au-Prince (DEP-001)")
 
 ### Requirement: Gestion des Marchés
@@ -92,11 +76,10 @@ Le système SHALL permettre la création et gestion des marchés.
 Le système SHALL faciliter la navigation dans la hiérarchie territoriale.
 
 #### Scenario: Navigation descendante
-- **WHEN** un utilisateur sélectionne une région
-- **THEN** les départements de cette région s'affichent
-- **AND** en sélectionnant un département, les communes s'affichent
+- **WHEN** un utilisateur sélectionne un département
+- **THEN** les communes de ce département  s'affichent
 - **AND** en sélectionnant une commune, les marchés s'affichent
-- **AND** le fil d'Ariane affiche le chemin complet (Région > Département > Commune > Marché)
+- **AND** le fil d'Ariane affiche le chemin complet (Département > Commune > Marché)
 
 #### Scenario: Recherche globale
 - **WHEN** un utilisateur utilise la recherche globale
@@ -105,7 +88,7 @@ Le système SHALL faciliter la navigation dans la hiérarchie territoriale.
 - **AND** cliquer sur un résultat navigue vers cet élément
 
 #### Scenario: Filtrage par niveau
-- **WHEN** un décideur consulte les collectes de sa région
+- **WHEN** un décideur consulte les collectes de son département
 - **THEN** il peut filtrer par département, commune, ou marché spécifique
 - **AND** le filtre se rappelle de la dernière sélection
 - **AND** des raccourcis sont disponibles pour "Tous les départements", "Toutes les communes"

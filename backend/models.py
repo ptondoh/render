@@ -45,7 +45,7 @@ class UserBase(BaseModel):
     email: EmailStr = Field(..., description="Email de l'utilisateur")
     role: Literal["agent", "décideur", "bailleur"] = Field(..., description="Rôle de l'utilisateur")
     nom: Optional[str] = Field(None, description="Nom complet")
-    region_id: Optional[str] = Field(None, description="ID de la région d'affectation")
+    departement_id: Optional[str] = Field(None, description="ID du département d'affectation")
     telephone: Optional[str] = Field(None, description="Numéro de téléphone")
     actif: bool = Field(True, description="Compte actif ou non")
 

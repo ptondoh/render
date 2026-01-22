@@ -35,10 +35,10 @@
 
 ## 4. Hiérarchie Territoriale
 
-- [ ] 4.1 Créer modèles Pydantic pour Région, Département, Commune, Marché dans `models.py`
+- [ ] 4.1 Créer modèles Pydantic pour Département, Commune, Marché dans `models.py`
 - [ ] 4.2 Créer `backend/services/hierarchie.py` avec CRUD complet pour chaque niveau
-- [ ] 4.3 Créer endpoints API `/api/regions`, `/api/departements`, `/api/communes`, `/api/marches`
-- [ ] 4.4 Implémenter génération automatique des codes (REG-XX, DEP-XXX, etc.)
+- [ ] 4.3 Créer endpoints API `/api/departements`, `/api/communes`, `/api/marches`
+- [ ] 4.4 Implémenter génération automatique des codes (DEP-XXX, COM-XXXXX, MAR-XXXXXX)
 - [ ] 4.5 Créer index MongoDB sur codes et champs parent pour performance
 - [ ] 4.6 Implémenter recherche hiérarchique et navigation descendante
 - [ ] 4.7 Créer script d'initialisation pour données territoriales de base (si disponibles)
@@ -50,7 +50,7 @@
 - [ ] 5.1 Créer modèle Pydantic pour Produit avec catégories et unités
 - [ ] 5.2 Créer `backend/services/produits.py` avec CRUD produits
 - [ ] 5.3 Créer endpoints API `/api/produits` (GET, POST, PUT, DELETE)
-- [ ] 5.4 Implémenter système de prix de référence par région
+- [ ] 5.4 Implémenter système de prix de référence par département
 - [ ] 5.5 Créer script d'initialisation pour les 8 produits prioritaires de Phase 0
 - [ ] 5.6 Implémenter recherche de produits (nom, catégorie, actif/inactif)
 
@@ -140,9 +140,9 @@
 ## 11. Dashboard et Statistiques
 
 - [ ] 11.1 Créer endpoint `/api/stats/dashboard` pour statistiques agent (nb collectes, taux validation, etc.)
-- [ ] 11.2 Créer endpoint `/api/stats/region` pour statistiques décideur (collectes région, alertes, etc.)
+- [ ] 11.2 Créer endpoint `/api/stats/departement` pour statistiques décideur (collectes département, alertes, etc.)
 - [ ] 11.3 Créer page dashboard agent avec graphiques simples (Chart.js ou bibliothèque légère)
-- [ ] 11.4 Créer page dashboard décideur avec vue régionale et alertes prioritaires
+- [ ] 11.4 Créer page dashboard décideur avec vue départementale et alertes prioritaires
 - [ ] 11.5 Créer page dashboard bailleur avec vue globale et exports
 
 **Validation** : Dashboards affichent données correctes, graphiques responsive

@@ -6,9 +6,12 @@
 Le système SHALL maintenir un référentiel complet des produits alimentaires surveillés.
 
 #### Scenario: Création d'un produit
-- **WHEN** un administrateur crée un nouveau produit
-- **THEN** les champs obligatoires sont : nom, unité de mesure, catégorie
-- **AND** un code PROD-XXX est généré automatiquement
+- **WHEN** un utilisateur qui a les permissions requises peut créer un nouveau produit
+- **THEN** les champs 
+  - obligatoires sont : nom, unité de mesure, quantité, catégorie, date de saisie
+  - non obligatoires sont : marché, source, niveau de l'offre, prix
+  - si le prix est present alors le nom du marché est obligatoire
+- **AND** un code un entier incremental est généré automatiquement
 - **AND** le produit peut avoir des synonymes/noms locaux (ex: "Riz local" = "Diri nasyonal")
 
 #### Scenario: Catégories de produits
@@ -26,7 +29,7 @@ Le système SHALL maintenir un référentiel complet des produits alimentaires s
 
 #### Scenario: Unités de mesure
 - **WHEN** un produit est créé
-- **THEN** l'unité de mesure est choisie parmi une liste standard : kg, litre, unité, sac (50kg), marmite, etc.
+- **THEN** l'unité de mesure est choisie parmi une liste standard : kg, litre, unité, sac, marmite, etc.
 - **AND** des équivalences peuvent être définies (ex: 1 sac = 50 kg)
 - **AND** lors de la collecte, l'agent voit l'unité attendue (ex: "Prix du riz (par kg)")
 
@@ -83,19 +86,19 @@ Le système SHALL faciliter la recherche de produits pour les agents.
 ### Requirement: Prix de Référence et Alertes
 Le système SHALL associer des prix de référence aux produits pour détecter les anomalies.
 
-#### Scenario: Prix de référence par région
+#### Scenario: Prix de référence par département
 - **WHEN** un administrateur configure un produit
-- **THEN** des prix de référence peuvent être définis par région (min, max, moyen)
+- **THEN** des prix de référence peuvent être définis par département (min, max, moyen)
 - **AND** ces prix servent de base pour les alertes de variation anormale
 
 #### Scenario: Détection d'anomalie à la saisie
-- **WHEN** un agent saisit un prix qui dépasse +/- 50% du prix de référence régional
+- **WHEN** un agent saisit un prix qui dépasse +/- 50% du prix de référence départemental
 - **THEN** un avertissement s'affiche : "Ce prix semble anormalement élevé/bas. Veuillez vérifier."
 - **AND** l'agent peut confirmer (avec commentaire obligatoire) ou corriger
 
 #### Scenario: Mise à jour automatique des références
 - **WHEN** des collectes validées sont accumulées sur un mois
-- **THEN** le système recalcule les prix de référence (médiane, min, max) par région
+- **THEN** le système recalcule les prix de référence (médiane, min, max) par département
 - **AND** les nouveaux prix de référence sont appliqués le mois suivant
 - **AND** l'historique des prix de référence est conservé
 
@@ -104,7 +107,7 @@ Le système SHALL gérer les équivalences entre unités de mesure.
 
 #### Scenario: Définition d'équivalences
 - **WHEN** un administrateur configure un produit
-- **THEN** il peut définir des équivalences : "1 sac = 50 kg", "1 marmite = 3 kg"
+- **THEN** il peut définir des équivalences : "1 sac = 50 kg", "1 marmite = 3 kg" 
 - **AND** ces équivalences sont utilisées pour normaliser les collectes
 
 #### Scenario: Collecte avec unité alternative
@@ -122,7 +125,7 @@ Le système SHALL permettre d'exporter et importer la liste des produits.
 - **AND** le fichier inclut tous les produits (actifs et inactifs)
 
 #### Scenario: Import CSV des produits
-- **WHEN** un administrateur importe un fichier CSV de produits
+- **WHEN** un agent importe un fichier CSV de produits
 - **THEN** le système valide : codes uniques, catégories valides, unités reconnues
 - **AND** les erreurs sont affichées ligne par ligne
 - **AND** l'import peut être en mode "mise à jour" (modifie l'existant) ou "ajout uniquement"

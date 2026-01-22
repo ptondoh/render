@@ -7,7 +7,7 @@ Le système SHALL guider l'agent à travers un processus de collecte structuré 
 
 #### Scenario: Étape 1 - Sélection du marché
 - **WHEN** un agent démarre une nouvelle collecte
-- **THEN** une liste des marchés de sa région s'affiche
+- **THEN** une liste des marchés de son département s'affiche
 - **AND** les marchés sont filtrables par nom ou code
 - **AND** la position géographique actuelle de l'agent est affichée sur une carte (si disponible)
 - **AND** après sélection, l'agent passe à l'étape 2

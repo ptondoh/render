@@ -263,7 +263,7 @@ curl -X POST http://localhost:8000/api/auth/register \
   "email": "agent@sap.ht",
   "role": "agent",
   "nom": "Jean Dupont",
-  "region_id": null,
+  "departement_id": null,
   "telephone": null,
   "actif": true,
   "id": "...",
@@ -531,7 +531,7 @@ npm install
 
 - **Section 4** - Gestion des Données
   - CRUD Produits
-  - CRUD Hiérarchie territoriale (Régions, Départements, Communes, Marchés)
+  - CRUD Hiérarchie territoriale (Départements, Communes, Marchés)
   - CRUD Collectes de prix
 
 - **Section 5** - Système d'Alertes

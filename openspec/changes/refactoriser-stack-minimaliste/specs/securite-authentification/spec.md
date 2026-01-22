@@ -54,7 +54,7 @@ Le système SHALL implémenter un RBAC avec trois rôles : Agent, Décideur, Bai
 - **WHEN** le système détermine les permissions d'un utilisateur
 - **THEN** les permissions suivantes s'appliquent :
   - **Agent** : Créer collectes, lire ses propres collectes, lire produits/marchés
-  - **Décideur** : Tout ce que Agent peut faire + valider collectes + voir toutes les collectes de sa région
+  - **Décideur** : Tout ce que Agent peut faire + valider collectes + voir toutes les collectes de son département
   - **Bailleur** : Lecture seule sur toutes les données (collectes, alertes, rapports)
 
 #### Scenario: Vérification des permissions
@@ -64,9 +64,9 @@ Le système SHALL implémenter un RBAC avec trois rôles : Agent, Décideur, Bai
 
 #### Scenario: Isolation territoriale
 - **WHEN** un Agent ou Décideur accède à des collectes
-- **THEN** seules les collectes de sa région (ou sous-régions) sont accessibles
-- **AND** les requêtes sont automatiquement filtrées par `region_id` du token JWT
-- **AND** les Bailleurs voient toutes les régions sans filtre
+- **THEN** seules les collectes de son département (ou sous-niveaux: communes, marchés) sont accessibles
+- **AND** les requêtes sont automatiquement filtrées par `departement_id` du token JWT
+- **AND** les Bailleurs voient tous les départements sans filtre
 
 ### Requirement: Chiffrement des Données Sensibles
 Le système SHALL chiffrer les données sensibles au repos et en transit.
