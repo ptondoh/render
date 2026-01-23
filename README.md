@@ -507,7 +507,81 @@ curl -H "Authorization: Bearer VOTRE_TOKEN" \
 }
 ```
 
-### 7. Explorer l'API avec Swagger UI
+### 7. Tester les Collectes de Prix et Alertes (Section 5)
+
+**Créer un agent:**
+```bash
+curl -X POST http://localhost:8000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "agent1@sap.ht",
+    "password": "MotDePasse123",
+    "role": "agent",
+    "nom": "Pierre Agent",
+    "actif": true
+  }'
+```
+
+**Se connecter comme agent:**
+```bash
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "agent1@sap.ht",
+    "password": "MotDePasse123"
+  }'
+# Sauvegarder le token dans une variable: AGENT_TOKEN=...
+```
+
+**Créer une collecte de prix:**
+```bash
+curl -X POST http://localhost:8000/api/collectes \
+  -H "Authorization: Bearer AGENT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "marche_id": "MARKET_ID",
+    "produit_id": "PRODUCT_ID",
+    "prix": 75.50,
+    "date": "2026-01-23T00:00:00",
+    "commentaire": "Prix élevé en raison de la pénurie"
+  }'
+```
+
+**Lister les collectes:**
+```bash
+curl -H "Authorization: Bearer DECIDEUR_TOKEN" \
+  "http://localhost:8000/api/collectes"
+```
+
+**Valider une collecte (génère automatiquement des alertes):**
+```bash
+curl -X POST \
+  -H "Authorization: Bearer DECIDEUR_TOKEN" \
+  "http://localhost:8000/api/collectes/COLLECTE_ID/valider"
+```
+
+**Consulter les alertes générées:**
+```bash
+curl -H "Authorization: Bearer DECIDEUR_TOKEN" \
+  "http://localhost:8000/api/alertes"
+```
+
+**Réponse attendue:** Alertes avec niveaux (surveillance/alerte/urgence) basés sur les variations de prix
+
+**Statistiques des alertes:**
+```bash
+curl -H "Authorization: Bearer DECIDEUR_TOKEN" \
+  "http://localhost:8000/api/alertes/statistiques/resume"
+```
+
+**Résoudre une alerte:**
+```bash
+curl -X POST \
+  -H "Authorization: Bearer DECIDEUR_TOKEN" \
+  "http://localhost:8000/api/alertes/ALERTE_ID/resoudre"
+```
+
+### 8. Explorer l'API avec Swagger UI
 
 Ouvrez votre navigateur: `http://localhost:8000/docs`
 
@@ -531,34 +605,37 @@ Swagger UI vous permet de:
 3. **audit_logs** - Logs d'audit des actions
    - Index sur `user_id`, `timestamp`, `action`
 
+4. **alertes** - Alertes de sécurité alimentaire (Section 5)
+   - Index sur `niveau`, `statut`, `marche_id`, `produit_id`, `created_at`
+
 **Collections référentiels (Section 4):**
-4. **unites_mesure** - Unités de mesure
+5. **unites_mesure** - Unités de mesure
    - Index sur `unite` (unique)
 
-5. **categories_produit** - Catégories de produits
+6. **categories_produit** - Catégories de produits
    - Index sur `nom`
 
-6. **categories_user** - Catégories d'utilisateurs
+7. **categories_user** - Catégories d'utilisateurs
    - Index sur `nom`
 
-7. **permissions** - Permissions système
+8. **permissions** - Permissions système
    - Index composé sur `nom` + `action` (unique)
 
-8. **roles** - Rôles avec permissions
+9. **roles** - Rôles avec permissions
    - Index sur `nom` (unique)
 
 **Collections hiérarchie territoriale:**
-9. **departements** - 10 départements d'Haïti
-   - Index sur `code` (unique), `actif`
+10. **departements** - 10 départements d'Haïti
+    - Index sur `code` (unique), `actif`
 
-10. **communes** - Communes (~145 au total)
+11. **communes** - Communes (~145 au total)
     - Index sur `code` (unique), `departement_id`, `actif`
 
-11. **marches** - Marchés locaux
+12. **marches** - Marchés locaux
     - Index sur `code` (unique), `commune_id`, `actif`
     - Index géospatial `2dsphere` sur `location`
 
-12. **produits** - Référentiel des produits alimentaires
+13. **produits** - Référentiel des produits alimentaires
     - Index sur `code` (unique), `actif`
 
 ### Se connecter à MongoDB:
@@ -711,14 +788,48 @@ npm install
 - ✅ **Section 2** - Backend API Foundation
 - ✅ **Section 3** - Sécurité et Authentification
 - ✅ **Section 4** - Gestion des Données de Référence
+- ✅ **Section 5** - Collectes de Prix et Alertes
+
+- ✅ **Section 5** - Collectes de Prix et Alertes
+
+### Section 5 - Collectes de Prix et Alertes ✅
+
+#### Endpoints collectes de prix (`/api/collectes/*`)
+1. ✅ `GET /api/collectes` - Liste des collectes (filtres: marché, produit, agent, statut, dates)
+2. ✅ `GET /api/collectes/{id}` - Détail d'une collecte
+3. ✅ `POST /api/collectes` - Créer une collecte (agents uniquement)
+4. ✅ `PUT /api/collectes/{id}` - Modifier collecte non validée
+5. ✅ `DELETE /api/collectes/{id}` - Supprimer collecte non validée
+6. ✅ `POST /api/collectes/{id}/valider` - Valider collecte + génération alertes (décideurs)
+7. ✅ `POST /api/collectes/{id}/rejeter` - Rejeter collecte avec motif (décideurs)
+8. ✅ `GET /api/collectes/statistiques/resume` - Stats collectes par statut et agent
+
+#### Endpoints alertes (`/api/alertes/*`)
+9. ✅ `GET /api/alertes` - Liste alertes (filtres: niveau, statut, marché, produit)
+10. ✅ `GET /api/alertes/{id}` - Détail d'une alerte
+11. ✅ `POST /api/alertes/{id}/marquer-vue` - Marquer alerte vue
+12. ✅ `POST /api/alertes/{id}/resoudre` - Résoudre alerte (décideurs)
+13. ✅ `GET /api/alertes/statistiques/resume` - Stats alertes par niveau et type
+14. ✅ `POST /api/alertes/generer` - Générer alertes manuellement (décideurs)
+
+#### Système d'alertes automatique
+- ✅ **Prix de référence** - Moyenne 30 jours glissants (minimum 3 collectes validées)
+- ✅ **4 niveaux d'alerte**:
+  - Normal: < 15% d'augmentation
+  - Surveillance: 15-30% d'augmentation
+  - Alerte: 30-50% d'augmentation
+  - Urgence: ≥ 50% d'augmentation
+- ✅ **Génération automatique** lors de la validation des collectes
+- ✅ **Enrichissement données** avec noms marché, commune, département, produit
+- ✅ **Suivi visualisation** - Alertes marquées "vues" par utilisateur
+- ✅ **Résolution** - Changement statut active → resolue (décideurs)
+
+#### Protection RBAC
+- ✅ **Agents** - Créer/modifier/supprimer leurs collectes non validées
+- ✅ **Décideurs** - Valider/rejeter collectes, résoudre alertes
+- ✅ **Tous rôles** - Consulter alertes et statistiques
 
 ### 🔄 Sections À Venir
-
-- **Section 5** - Collectes de Prix et Alertes
-  - CRUD Collectes de prix (mode hors-ligne)
-  - Calcul automatique des alertes (4 niveaux)
-  - Endpoints de consultation des alertes
-  - Notifications (SendGrid)
 
 - **Section 6** - Frontend
   - Interface utilisateur (HTML + JS + Tailwind)
@@ -740,20 +851,31 @@ MIT
 
 ---
 
-**Status**: ✅ Sections 1, 2, 3, 4 terminées - Backend API complet avec référentiels
-**Version**: v0.2
+**Status**: ✅ Sections 1, 2, 3, 4, 5 terminées - Backend API complet avec collectes et alertes
+**Version**: v0.3
 **Dernière mise à jour**: 2026-01-23
 
-**Endpoints disponibles**: 42 endpoints
+**Endpoints disponibles**: 60 endpoints
 - 3 endpoints de base (/, /health, /version)
 - 8 endpoints d'authentification
 - 10 endpoints de référentiels (unités, catégories, permissions, rôles)
 - 13 endpoints hiérarchie territoriale (départements, communes)
 - 5 endpoints produits (CRUD)
 - 6 endpoints marchés (CRUD)
+- 8 endpoints collectes de prix (CRUD + validation + stats)
+- 6 endpoints alertes (consultation + résolution + stats + génération manuelle)
 
-**Collections MongoDB**: 12 collections avec index optimisés
+**Collections MongoDB**: 14 collections avec index optimisés
+- 12 collections existantes
+- collectes_prix (avec indexes: marche_id, produit_id, date, agent_id, statut)
+- alertes (avec indexes: niveau, statut, marche_id, produit_id, created_at)
+
 **Données de seed**: 8 unités, 8 catégories, 10 départements, 28 communes, 15 produits
 
-**Tests**: ✅ Inscription, Connexion, JWT, MFA, CRUD complet sur tous les référentiels
-**Prochaine étape**: Section 5 - Collectes de Prix et Alertes
+**Tests**: ✅ Toutes les fonctionnalités backend testées et validées
+- Authentification (inscription, connexion, JWT, MFA)
+- CRUD complet sur tous les référentiels
+- Collectes de prix (création, validation, rejet, stats)
+- Système d'alertes automatique (3 niveaux testés: surveillance, alerte, urgence)
+
+**Prochaine étape**: Section 6 - Frontend
