@@ -144,6 +144,9 @@ sap-minimaliste/
 │   │   ├── security.py        ✅ Middleware JWT
 │   │   ├── rbac.py            ✅ Contrôle d'accès basé sur les rôles
 │   │   └── audit.py           ✅ Logging des actions utilisateurs
+│   ├── scripts/
+│   │   ├── seed_data.py       ✅ Initialisation données de référence
+│   │   └── create_test_user.py ✅ Création utilisateur test (admin@sap.ht)
 │   ├── tests/                 # Tests Playwright (à venir)
 │   ├── __init__.py            ✅ Package backend
 │   ├── main.py                ✅ Point d'entrée FastAPI
@@ -151,14 +154,21 @@ sap-minimaliste/
 │   ├── models.py              ✅ Modèles Pydantic (User, Produit, Marche, etc.)
 │   └── database.py            ✅ Connexion MongoDB avec Motor
 ├── frontend/
-│   ├── modules/               # Modules JavaScript (à venir)
+│   ├── modules/
+│   │   ├── auth.js            ✅ Gestion authentification (login, MFA, JWT)
+│   │   ├── api.js             ✅ Client API REST
+│   │   └── ui.js              ✅ Composants réutilisables (Button, Input, Card, etc.)
+│   ├── pages/
+│   │   ├── login.js           ✅ Page de connexion avec MFA
+│   │   ├── dashboard.js       ✅ Tableau de bord avec statistiques
+│   │   └── 404.js             ✅ Page erreur 404
 │   ├── i18n/                  # Fichiers de traduction FR/HT (à venir)
-│   ├── dist/                  # CSS compilé
+│   ├── dist/
 │   │   └── output.css         ✅ CSS compilé Tailwind
 │   ├── styles.css             ✅ Configuration Tailwind
-│   ├── index.html             # Point d'entrée (à venir)
-│   ├── app.js                 # Routeur principal (à venir)
-│   └── sw.js                  # Service Worker (à venir)
+│   ├── index.html             ✅ Structure HTML de base
+│   ├── app.js                 ✅ Routeur SPA avec protection routes
+│   └── sw.js                  ✅ Service Worker (mode hors-ligne basique)
 ├── openspec/                  # Spécifications OpenSpec
 │   └── changes/refactoriser-stack-minimaliste/
 │       ├── proposal.md        ✅ Proposition
@@ -591,6 +601,44 @@ Swagger UI vous permet de:
 - 📝 Voir les schémas de requête/réponse
 - 🔐 Autoriser avec votre token JWT (bouton "Authorize")
 
+### 9. Tester l'Interface Frontend
+
+**Démarrer le serveur frontend:**
+```bash
+# Dans un terminal séparé
+cd frontend
+python -m http.server 3000
+```
+
+**Ouvrir l'application:**
+Navigateur: `http://localhost:3000/frontend/index.html`
+
+**Se connecter avec l'utilisateur test:**
+- Email: `admin@sap.ht`
+- Mot de passe: `admin123`
+
+**Important - Désenregistrer le Service Worker (première fois):**
+
+Si la page de login ne fonctionne pas correctement:
+1. Ouvrir les DevTools (F12)
+2. Onglet "Application" → "Service Workers"
+3. Cliquer sur "Unregister" pour le service worker de `localhost:3000`
+4. Rafraîchir la page (F5)
+
+Ou via la console DevTools:
+```javascript
+navigator.serviceWorker.getRegistrations().then(registrations => {
+    registrations.forEach(r => r.unregister());
+}).then(() => location.reload());
+```
+
+**Pages disponibles:**
+- ✅ `/frontend/index.html#/login` - Page de connexion
+- ✅ `/frontend/index.html#/dashboard` - Tableau de bord (après connexion)
+- ❌ `/frontend/index.html#/collectes` - À venir
+- ❌ `/frontend/index.html#/alertes` - À venir
+- ❌ `/frontend/index.html#/profil` - À venir
+
 ## 📊 Base de Données MongoDB
 
 ### Collections créées automatiquement:
@@ -789,8 +837,7 @@ npm install
 - ✅ **Section 3** - Sécurité et Authentification
 - ✅ **Section 4** - Gestion des Données de Référence
 - ✅ **Section 5** - Collectes de Prix et Alertes
-
-- ✅ **Section 5** - Collectes de Prix et Alertes
+- ⚙️ **Section 6** - Frontend Architecture de Base (en cours)
 
 ### Section 5 - Collectes de Prix et Alertes ✅
 
@@ -829,12 +876,78 @@ npm install
 - ✅ **Décideurs** - Valider/rejeter collectes, résoudre alertes
 - ✅ **Tous rôles** - Consulter alertes et statistiques
 
-### 🔄 Sections À Venir
+### Section 6 - Frontend Architecture de Base ⚙️ (En cours)
 
-- **Section 6** - Frontend
-  - Interface utilisateur (HTML + JS + Tailwind)
-  - Mode hors-ligne (Service Worker + IndexedDB)
-  - Internationalisation (FR/HT)
+#### Pages créées (`frontend/pages/`)
+1. ✅ `login.js` - Page de connexion avec support MFA
+   - Formulaire email/password avec validation
+   - Gestion des erreurs et re-render
+   - Support authentification à deux facteurs
+   - Conservation des valeurs lors du re-render
+2. ✅ `dashboard.js` - Tableau de bord décideur
+   - Vue d'ensemble des collectes et alertes
+   - Statistiques en temps réel
+   - Alertes récentes avec niveau d'urgence
+   - Actions rapides (validation collectes, consultation alertes)
+3. ✅ `404.js` - Page d'erreur 404
+
+#### Modules JavaScript (`frontend/modules/`)
+4. ✅ `auth.js` - Gestionnaire d'authentification
+   - Login/logout avec gestion JWT
+   - Vérification MFA (TOTP)
+   - Configuration/désactivation MFA
+   - Gestion tokens (access + refresh)
+   - Stockage utilisateur local
+   - Vérification rôles et permissions
+5. ✅ `api.js` - Client API REST
+   - Requêtes GET/POST/PUT/DELETE
+   - Gestion automatique JWT
+   - Refresh automatique des tokens
+   - Gestion erreurs HTTP
+   - Support mode hors-ligne
+6. ✅ `ui.js` - Composants réutilisables
+   - Button, Input, Card, Modal
+   - Alert, Toast, Spinner
+   - Badge, Table
+   - Gestion correcte attributs booléens HTML (disabled, checked, selected)
+
+#### Infrastructure frontend
+7. ✅ `index.html` - Structure HTML de base
+   - Navigation responsive (desktop + mobile)
+   - Menu utilisateur avec avatar
+   - Indicateur de connexion
+   - Conteneurs toast et modal
+8. ✅ `app.js` - Routeur SPA
+   - Gestion routes avec hash (#/login, #/dashboard, etc.)
+   - Protection routes authentifiées
+   - Import dynamique des pages
+   - Gestion navigation et URL
+9. ✅ `sw.js` - Service Worker
+   - Cache-first pour assets statiques
+   - Network-first pour API
+   - Gestion erreurs de fetch améliorée
+   - Support mode hors-ligne basique
+
+#### Utilitaires
+10. ✅ `backend/scripts/create_test_user.py` - Script création utilisateur test
+    - Email: admin@sap.ht
+    - Mot de passe: admin123
+    - Rôle: décideur
+
+#### Corrections apportées
+- ✅ Attributs booléens HTML (disabled, checked, selected) maintenant gérés correctement
+- ✅ Conservation des valeurs des champs lors du re-render
+- ✅ Correction erreurs de lecture du DOM après destruction
+- ✅ Amélioration gestion des erreurs dans Service Worker
+
+#### À compléter pour Section 6
+- ❌ `frontend/pages/collectes.js` - Page gestion collectes de prix
+- ❌ `frontend/pages/alertes.js` - Page consultation et résolution alertes
+- ❌ `frontend/pages/profil.js` - Page profil utilisateur
+- ❌ Mode hors-ligne avancé (IndexedDB + synchronisation)
+- ❌ Internationalisation FR/HT (i18n)
+
+### 🔄 Sections À Venir
 
 - **Section 7** - Tests et Déploiement
   - Tests E2E avec Playwright
@@ -851,11 +964,11 @@ MIT
 
 ---
 
-**Status**: ✅ Sections 1, 2, 3, 4, 5 terminées - Backend API complet avec collectes et alertes
-**Version**: v0.3
+**Status**: ✅ Sections 1-5 terminées | ⚙️ Section 6 en cours (login + dashboard fonctionnels)
+**Version**: v0.4
 **Dernière mise à jour**: 2026-01-23
 
-**Endpoints disponibles**: 60 endpoints
+**Backend API**: 60 endpoints
 - 3 endpoints de base (/, /health, /version)
 - 8 endpoints d'authentification
 - 10 endpoints de référentiels (unités, catégories, permissions, rôles)
@@ -865,17 +978,26 @@ MIT
 - 8 endpoints collectes de prix (CRUD + validation + stats)
 - 6 endpoints alertes (consultation + résolution + stats + génération manuelle)
 
+**Frontend**: 3 pages + 3 modules
+- ✅ Pages: login.js, dashboard.js, 404.js
+- ✅ Modules: auth.js, api.js, ui.js
+- ✅ Routeur SPA avec protection routes
+- ✅ Service Worker avec mode hors-ligne basique
+- ❌ À venir: pages collectes, alertes, profil + i18n
+
 **Collections MongoDB**: 14 collections avec index optimisés
-- 12 collections existantes
-- collectes_prix (avec indexes: marche_id, produit_id, date, agent_id, statut)
-- alertes (avec indexes: niveau, statut, marche_id, produit_id, created_at)
+- Collections référentiels, territoriaux, collectes_prix, alertes
 
-**Données de seed**: 8 unités, 8 catégories, 10 départements, 28 communes, 15 produits
+**Données de test**:
+- Seed data: 8 unités, 8 catégories, 10 départements, 28 communes, 15 produits
+- Utilisateur test: admin@sap.ht / admin123 (rôle: décideur)
 
-**Tests**: ✅ Toutes les fonctionnalités backend testées et validées
+**Tests**: ✅ Backend complet + Frontend login/dashboard validés
 - Authentification (inscription, connexion, JWT, MFA)
 - CRUD complet sur tous les référentiels
 - Collectes de prix (création, validation, rejet, stats)
-- Système d'alertes automatique (3 niveaux testés: surveillance, alerte, urgence)
+- Système d'alertes automatique (3 niveaux: surveillance, alerte, urgence)
+- Interface login avec gestion erreurs et re-render
+- Dashboard avec statistiques en temps réel
 
-**Prochaine étape**: Section 6 - Frontend
+**Prochaine étape**: Compléter Section 6 - Pages collectes, alertes, profil + mode hors-ligne avancé
