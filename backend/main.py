@@ -22,7 +22,9 @@ from backend.routers import (
     referentiels as referentiels_router,
     territoires as territoires_router,
     produits as produits_router,
-    marches as marches_router
+    marches as marches_router,
+    collectes as collectes_router,
+    alertes as alertes_router
 )
 
 # Configuration du logging
@@ -76,15 +78,22 @@ app = FastAPI(
     * **Hiérarchie territoriale** - Départements > Communes > Marchés (13 endpoints)
     * **Produits** - Référentiel des produits alimentaires (5 endpoints)
     * **Marchés** - Gestion des marchés locaux (6 endpoints)
-    * **Collecte de prix** - Collecte de prix sur les marchés (mode hors-ligne supporté)
-    * **Alertes** - Système d'alertes à 4 niveaux (Normal, Surveillance, Alerte, Urgence)
+    * **Collectes de prix** - Collecte de prix sur les marchés avec mode hors-ligne (10 endpoints)
+    * **Alertes** - Système d'alertes automatique à 4 niveaux (8 endpoints)
+
+    ## Système d'Alertes:
+
+    * **4 niveaux**: Normal, Surveillance (+15%), Alerte (+30%), Urgence (+50%)
+    * **Calcul automatique** basé sur les variations de prix
+    * **Prix de référence** calculé sur 30 jours glissants
+    * **Notifications** aux décideurs et bailleurs (à venir)
 
     ## Stack Technique:
 
     * **Backend**: FastAPI + Python 3.13
     * **Base de données**: MongoDB 8.23
     * **Authentification**: JWT + MFA (TOTP)
-    * **Notifications**: SendGrid (email)
+    * **Notifications**: SendGrid (email) - à venir
     * **RBAC**: Contrôle d'accès basé sur les rôles (agent, décideur, bailleur)
     """,
     version="0.1.0",
@@ -124,6 +133,8 @@ app.include_router(referentiels_router.router)
 app.include_router(territoires_router.router)
 app.include_router(produits_router.router)
 app.include_router(marches_router.router)
+app.include_router(collectes_router.router)
+app.include_router(alertes_router.router)
 
 
 # ============================================================================

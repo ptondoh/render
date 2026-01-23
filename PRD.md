@@ -5,7 +5,7 @@
 **Objectif :** Établir la fondation sécurisée, la hiérarchie territoriale et la collecte de prix sur les marchés.
 
 * **Architecture Géo-Administrative :**
-* Implémentation de la cascade : **Région > Département > Commune > Marché**.
+* Implémentation de la cascade : **Département > Commune > Marché**.
 * Référentiel des **Produits** (Riz, Maïs, Haricots, Huile, Sucre, etc.).
 
 
