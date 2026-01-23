@@ -218,7 +218,103 @@ sap-minimaliste/
 7. ✅ `POST /api/auth/mfa/verify-setup` - Activer MFA
 8. ✅ `POST /api/auth/mfa/disable` - Désactiver MFA
 
+### Section 4 - Gestion des Données de Référence ✅
+
+#### Modèles enrichis (`backend/models.py`)
+- ✅ `UniteMesure` - Unités de mesure (kg, livre, sac, marmite, etc.)
+- ✅ `CategorieProduit` - Catégories de produits
+- ✅ `CategorieUser` - Catégories d'utilisateurs
+- ✅ `Permission` - Permissions système
+- ✅ `Role` - Rôles avec permissions
+- ✅ `Departement` - 10 départements d'Haïti
+- ✅ `Commune` - Communes avec type_zone (urbaine/péri-urbaine/rurale)
+- ✅ `Produit` enrichi - Relations avec catégorie et unité de mesure
+- ✅ `Marche` enrichi - Nom créole, spécialités, contacts
+- ✅ `User` enrichi - Prénom, catégorie, rôle
+
+#### Endpoints référentiels (`/api/*`)
+1. ✅ `GET/POST /api/unites-mesure` - Gestion des unités de mesure
+2. ✅ `GET/POST /api/categories-produit` - Gestion des catégories de produits
+3. ✅ `GET/POST /api/categories-user` - Gestion des catégories d'utilisateurs
+4. ✅ `GET/POST /api/permissions` - Gestion des permissions (décideur uniquement)
+5. ✅ `GET/POST /api/roles` - Gestion des rôles (décideur uniquement)
+
+#### Endpoints hiérarchie territoriale (`/api/*`)
+6. ✅ `GET/POST/PUT/DELETE /api/departements` - CRUD départements
+7. ✅ `GET /api/departements/{id}` - Détail d'un département
+8. ✅ `GET /api/departements/{id}/communes` - Communes d'un département
+9. ✅ `GET/POST/PUT/DELETE /api/communes` - CRUD communes
+10. ✅ `GET /api/communes/{id}` - Détail d'une commune
+
+#### Endpoints produits (`/api/produits/*`)
+11. ✅ `GET /api/produits` - Liste des produits (filtrable par catégorie)
+12. ✅ `GET /api/produits/{id}` - Détail d'un produit
+13. ✅ `POST /api/produits` - Créer un produit (décideur)
+14. ✅ `PUT /api/produits/{id}` - Modifier un produit (décideur)
+15. ✅ `DELETE /api/produits/{id}` - Supprimer un produit (décideur)
+
+#### Endpoints marchés (`/api/marches/*`)
+16. ✅ `GET /api/marches` - Liste des marchés (filtrable par commune/département)
+17. ✅ `GET /api/marches/{id}` - Détail d'un marché
+18. ✅ `POST /api/marches` - Créer un marché (décideur)
+19. ✅ `PUT /api/marches/{id}` - Modifier un marché (décideur)
+20. ✅ `DELETE /api/marches/{id}` - Supprimer un marché (décideur)
+21. ✅ `GET /api/marches/communes/{id}/marches` - Marchés d'une commune
+
+#### Script de seed data (`backend/scripts/seed_data.py`)
+- ✅ 8 unités de mesure (kg, livre, sac, marmite, litre, gallon, unité, douzaine)
+- ✅ 8 catégories de produits (céréales, légumineuses, huiles, tubercules, etc.)
+- ✅ 10 départements d'Haïti avec codes ISO (HT-OU, HT-AR, HT-ND, etc.)
+- ✅ 28 communes principales (Port-au-Prince, Cap-Haïtien, Gonaïves, etc.)
+- ✅ 15 produits de base (riz, maïs, haricots, huile, sucre, etc.)
+
+#### Protection RBAC
+- ✅ Lecture: tous les rôles authentifiés
+- ✅ Création/Modification: décideur uniquement
+- ✅ Vérifications d'intégrité référentielle
+- ✅ Soft delete pour données avec relations
+
 ## 🧪 Tests et Validation
+
+### 0. Initialiser les Données de Référence
+
+**Important:** Avant de tester l'API, exécutez le script de seed data pour créer les données de base.
+
+```bash
+# Assurez-vous que MongoDB est démarré
+net start MongoDB
+
+# Exécuter le script de seed data
+python -m backend.scripts.seed_data
+```
+
+**Résultat attendu:**
+```
+======================================================================
+INITIALISATION DES DONNEES DE REFERENCE DU SAP
+======================================================================
+
+[1/5] Initialisation des unites de mesure...
+   -> 8 unites de mesure creees
+
+[2/5] Initialisation des categories de produits...
+   -> 8 categories de produits creees
+
+[3/5] Initialisation des departements...
+   -> 10 departements crees
+
+[4/5] Initialisation des communes...
+   -> 28 communes creees
+
+[5/5] Initialisation des produits...
+   -> 15 produits crees
+
+======================================================================
+INITIALISATION TERMINEE AVEC SUCCES!
+======================================================================
+```
+
+**Note:** Le script est idempotent - il ne créera pas de doublons si les données existent déjà.
 
 ### 1. Tester le Health Check
 
@@ -344,7 +440,74 @@ curl -X POST http://localhost:8000/api/auth/mfa/setup \
 
 Le QR code peut être scanné avec Google Authenticator, Authy, ou toute app TOTP.
 
-### 6. Explorer l'API avec Swagger UI
+### 6. Tester les Endpoints de la Section 4
+
+**Créer un utilisateur décideur:**
+```bash
+curl -X POST http://localhost:8000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "decideur@sap.ht",
+    "password": "MotDePasse123",
+    "role": "décideur",
+    "nom": "Jean Decideur",
+    "actif": true
+  }'
+```
+
+**Se connecter et récupérer le token:**
+```bash
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "decideur@sap.ht",
+    "password": "MotDePasse123"
+  }'
+```
+
+**Tester les unités de mesure:**
+```bash
+# Lister les unités de mesure
+curl -H "Authorization: Bearer VOTRE_TOKEN" \
+  http://localhost:8000/api/unites-mesure
+```
+
+**Réponse attendue:** 8 unités (kg, livre, sac, marmite, litre, gallon, unité, douzaine)
+
+**Tester les départements:**
+```bash
+# Lister les départements
+curl -H "Authorization: Bearer VOTRE_TOKEN" \
+  http://localhost:8000/api/departements
+```
+
+**Réponse attendue:** 10 départements d'Haïti avec codes ISO
+
+**Tester les produits:**
+```bash
+# Lister les produits
+curl -H "Authorization: Bearer VOTRE_TOKEN" \
+  http://localhost:8000/api/produits
+```
+
+**Réponse attendue:** 15 produits avec relations (categorie_nom, unite_nom)
+
+**Exemple de réponse produit:**
+```json
+{
+  "nom": "Riz importé",
+  "nom_creole": "Diri etranje",
+  "code": "PROD-RIZ-IMP",
+  "id_categorie": "...",
+  "id_unite_mesure": "...",
+  "id": "...",
+  "actif": true,
+  "categorie_nom": "Céréales",
+  "unite_nom": "livre"
+}
+```
+
+### 7. Explorer l'API avec Swagger UI
 
 Ouvrez votre navigateur: `http://localhost:8000/docs`
 
@@ -358,9 +521,9 @@ Swagger UI vous permet de:
 
 ### Collections créées automatiquement:
 
+**Collections principales:**
 1. **users** - Utilisateurs du système
-   - Index sur `email` (unique)
-   - Index sur `role`
+   - Index sur `email` (unique), `role`
 
 2. **collectes_prix** - Collectes de prix sur les marchés
    - Index sur `marche_id`, `produit_id`, `date`, `agent_id`, `statut`
@@ -368,14 +531,35 @@ Swagger UI vous permet de:
 3. **audit_logs** - Logs d'audit des actions
    - Index sur `user_id`, `timestamp`, `action`
 
-4. **produits** - Référentiel des produits
-   - Index sur `code` (unique)
-   - Index sur `actif`
+**Collections référentiels (Section 4):**
+4. **unites_mesure** - Unités de mesure
+   - Index sur `unite` (unique)
 
-5. **marches** - Marchés (lieux de collecte)
-   - Index sur `code` (unique)
-   - Index sur `commune_id`
-   - Index géospatial `2dsphere` sur `location`
+5. **categories_produit** - Catégories de produits
+   - Index sur `nom`
+
+6. **categories_user** - Catégories d'utilisateurs
+   - Index sur `nom`
+
+7. **permissions** - Permissions système
+   - Index composé sur `nom` + `action` (unique)
+
+8. **roles** - Rôles avec permissions
+   - Index sur `nom` (unique)
+
+**Collections hiérarchie territoriale:**
+9. **departements** - 10 départements d'Haïti
+   - Index sur `code` (unique), `actif`
+
+10. **communes** - Communes (~145 au total)
+    - Index sur `code` (unique), `departement_id`, `actif`
+
+11. **marches** - Marchés locaux
+    - Index sur `code` (unique), `commune_id`, `actif`
+    - Index géospatial `2dsphere` sur `location`
+
+12. **produits** - Référentiel des produits alimentaires
+    - Index sur `code` (unique), `actif`
 
 ### Se connecter à MongoDB:
 
@@ -526,15 +710,12 @@ npm install
 - ✅ **Section 1** - Infrastructure et configuration
 - ✅ **Section 2** - Backend API Foundation
 - ✅ **Section 3** - Sécurité et Authentification
+- ✅ **Section 4** - Gestion des Données de Référence
 
 ### 🔄 Sections À Venir
 
-- **Section 4** - Gestion des Données
-  - CRUD Produits
-  - CRUD Hiérarchie territoriale (Départements, Communes, Marchés)
-  - CRUD Collectes de prix
-
-- **Section 5** - Système d'Alertes
+- **Section 5** - Collectes de Prix et Alertes
+  - CRUD Collectes de prix (mode hors-ligne)
   - Calcul automatique des alertes (4 niveaux)
   - Endpoints de consultation des alertes
   - Notifications (SendGrid)
@@ -559,10 +740,20 @@ MIT
 
 ---
 
-**Status**: ✅ Sections 1, 2, 3 terminées - Authentification complète fonctionnelle
-**Version**: v0.1
-**Dernière mise à jour**: 2026-01-22
+**Status**: ✅ Sections 1, 2, 3, 4 terminées - Backend API complet avec référentiels
+**Version**: v0.2
+**Dernière mise à jour**: 2026-01-23
 
-**Endpoints disponibles**: 11 (3 base + 8 authentification)
-**Tests**: ✅ Inscription, Connexion, JWT, MFA
-**Prochaine étape**: Section 4 - Gestion des Données
+**Endpoints disponibles**: 42 endpoints
+- 3 endpoints de base (/, /health, /version)
+- 8 endpoints d'authentification
+- 10 endpoints de référentiels (unités, catégories, permissions, rôles)
+- 13 endpoints hiérarchie territoriale (départements, communes)
+- 5 endpoints produits (CRUD)
+- 6 endpoints marchés (CRUD)
+
+**Collections MongoDB**: 12 collections avec index optimisés
+**Données de seed**: 8 unités, 8 catégories, 10 départements, 28 communes, 15 produits
+
+**Tests**: ✅ Inscription, Connexion, JWT, MFA, CRUD complet sur tous les référentiels
+**Prochaine étape**: Section 5 - Collectes de Prix et Alertes
