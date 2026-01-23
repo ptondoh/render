@@ -14,6 +14,9 @@ export default function LoginPage() {
     let mfaRequired = false;
     let tempToken = null;
     let errorMessage = '';
+    let emailValue = '';
+    let passwordValue = '';
+    let mfaCode = '';
 
     // Formulaire de connexion
     function renderLoginForm() {
@@ -69,7 +72,9 @@ export default function LoginPage() {
                         label: 'Adresse email',
                         placeholder: 'exemple@sap.ht',
                         required: true,
-                        id: 'email-input'
+                        id: 'email-input',
+                        value: emailValue,
+                        onChange: (value) => { emailValue = value; }
                     });
                     form.appendChild(emailInput);
 
@@ -79,7 +84,9 @@ export default function LoginPage() {
                         label: 'Mot de passe',
                         placeholder: '••••••••',
                         required: true,
-                        id: 'password-input'
+                        id: 'password-input',
+                        value: passwordValue,
+                        onChange: (value) => { passwordValue = value; }
                     });
                     form.appendChild(passwordInput);
 
@@ -121,10 +128,7 @@ export default function LoginPage() {
                     form.addEventListener('submit', async (e) => {
                         e.preventDefault();
 
-                        const email = document.getElementById('email-input').querySelector('input').value;
-                        const password = document.getElementById('password-input').querySelector('input').value;
-
-                        if (!email || !password) {
+                        if (!emailValue || !passwordValue) {
                             errorMessage = 'Veuillez remplir tous les champs';
                             render();
                             return;
@@ -135,7 +139,7 @@ export default function LoginPage() {
                         render();
 
                         try {
-                            const result = await auth.login(email, password);
+                            const result = await auth.login(emailValue, passwordValue);
 
                             if (result.mfa_required) {
                                 // Passer à l'étape MFA
@@ -213,6 +217,8 @@ export default function LoginPage() {
                         placeholder: '123456',
                         required: true,
                         id: 'mfa-code-input',
+                        value: mfaCode,
+                        onChange: (value) => { mfaCode = value; },
                         maxlength: '6',
                         pattern: '[0-9]{6}'
                     });
@@ -243,6 +249,7 @@ export default function LoginPage() {
                             mfaRequired = false;
                             tempToken = null;
                             errorMessage = '';
+                            mfaCode = '';
                             render();
                         }
                     });
@@ -252,9 +259,7 @@ export default function LoginPage() {
                     form.addEventListener('submit', async (e) => {
                         e.preventDefault();
 
-                        const code = document.getElementById('mfa-code-input').querySelector('input').value;
-
-                        if (!code || code.length !== 6) {
+                        if (!mfaCode || mfaCode.length !== 6) {
                             errorMessage = 'Veuillez entrer un code à 6 chiffres';
                             render();
                             return;
@@ -265,7 +270,7 @@ export default function LoginPage() {
                         render();
 
                         try {
-                            await auth.verifyMFA(tempToken, code);
+                            await auth.verifyMFA(tempToken, mfaCode);
                             // Connexion réussie, rediriger
                             window.location.hash = '#/dashboard';
 

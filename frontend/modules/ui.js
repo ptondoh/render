@@ -18,6 +18,11 @@ function createElement(tag, attributes = {}, ...children) {
         } else if (key.startsWith('on') && typeof value === 'function') {
             const event = key.substring(2).toLowerCase();
             element.addEventListener(event, value);
+        } else if (key === 'disabled' || key === 'checked' || key === 'selected') {
+            // Pour les attributs booléens, ne les ajouter que si la valeur est true
+            if (value) {
+                element.setAttribute(key, key);
+            }
         } else {
             element.setAttribute(key, value);
         }

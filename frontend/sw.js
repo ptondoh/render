@@ -71,17 +71,23 @@ self.addEventListener('fetch', (event) => {
                 })
         );
     } else {
-        // Cache First pour les assets statiques
+        // Cache First pour les assets statiques, mais toujours essayer le réseau
         event.respondWith(
             caches.match(request)
-                .then((response) => {
-                    return response || fetch(request);
-                })
-                .catch(() => {
-                    // Fallback pour les pages HTML
-                    if (request.destination === 'document') {
-                        return caches.match('/frontend/index.html');
+                .then((cachedResponse) => {
+                    if (cachedResponse) {
+                        return cachedResponse;
                     }
+                    // Si pas en cache, faire une vraie requête réseau
+                    return fetch(request).catch((error) => {
+                        console.error('SW: Erreur fetch pour', request.url, error);
+                        // Fallback pour les pages HTML
+                        if (request.destination === 'document') {
+                            return caches.match('/frontend/index.html');
+                        }
+                        // Pour les autres ressources, propager l'erreur
+                        throw error;
+                    });
                 })
         );
     }
