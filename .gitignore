@@ -55,3 +55,10 @@ playwright/.cache/
 # Backups
 *.bak
 *.backup
+
+# Test files
+test_*.json
+test_*.html
+
+# Claude Code
+.claude/
