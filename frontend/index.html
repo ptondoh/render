@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Système d'Alerte Précoce pour la sécurité alimentaire en Haïti">
+    <meta name="theme-color" content="#2563eb">
+
+    <title>SAP - Système d'Alerte Précoce</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="/frontend/dist/output.css">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- iOS Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="SAP">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Indicateur de connexion -->
+    <div id="connection-status" class="hidden fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-white text-center py-2 text-sm font-medium">
+        <span id="connection-message">Mode hors-ligne - Les données seront synchronisées automatiquement</span>
+    </div>
+
+    <!-- Navigation principale -->
+    <nav id="main-nav" class="hidden bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <!-- Logo et titre -->
+                <div class="flex items-center">
+                    <a href="#/" class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                            <span class="text-white font-bold text-xl">S</span>
+                        </div>
+                        <div>
+                            <h1 class="text-lg font-bold text-gray-900">SAP</h1>
+                            <p class="text-xs text-gray-500">Alerte Précoce</p>
+                        </div>
+                    </a>
+                </div>
+
+                <!-- Menu desktop -->
+                <div class="hidden md:flex md:items-center md:space-x-4">
+                    <a href="#/dashboard" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                        Tableau de bord
+                    </a>
+                    <a href="#/collectes" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                        Collectes
+                    </a>
+                    <a href="#/alertes" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                        Alertes
+                    </a>
+
+                    <!-- User menu -->
+                    <div class="relative">
+                        <button id="user-menu-button" class="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100">
+                            <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                                <span class="text-white text-sm font-medium" id="user-initials">U</span>
+                            </div>
+                            <span id="user-name">Utilisateur</span>
+                        </button>
+
+                        <!-- Dropdown menu -->
+                        <div id="user-menu-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                            <a href="#/profil" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Mon profil</a>
+                            <button id="logout-button" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                Déconnexion
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Menu mobile button -->
+                <div class="md:hidden flex items-center">
+                    <button id="mobile-menu-button" class="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Menu mobile -->
+        <div id="mobile-menu" class="hidden md:hidden border-t border-gray-200">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="#/dashboard" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                    Tableau de bord
+                </a>
+                <a href="#/collectes" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                    Collectes
+                </a>
+                <a href="#/alertes" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                    Alertes
+                </a>
+                <a href="#/profil" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
+                    Mon profil
+                </a>
+                <button id="mobile-logout-button" class="w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50">
+                    Déconnexion
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Conteneur principal de l'application -->
+    <main id="app" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Le contenu sera injecté ici par le routeur -->
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <p class="mt-4 text-gray-600">Chargement...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast container pour notifications -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2">
+        <!-- Les toasts seront injectés ici -->
+    </div>
+
+    <!-- Modal container -->
+    <div id="modal-container">
+        <!-- Les modals seront injectés ici -->
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="/frontend/modules/api.js"></script>
+    <script type="module" src="/frontend/modules/ui.js"></script>
+    <script type="module" src="/frontend/modules/auth.js"></script>
+    <script type="module" src="/frontend/app.js"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/frontend/sw.js')
+                    .then(registration => console.log('SW registered'))
+                    .catch(err => console.log('SW registration failed'));
+            });
+        }
+
+        // Connection status monitoring
+        window.addEventListener('online', () => {
+            document.getElementById('connection-status').classList.add('hidden');
+        });
+
+        window.addEventListener('offline', () => {
+            document.getElementById('connection-status').classList.remove('hidden');
+        });
+
+        // Check initial connection status
+        if (!navigator.onLine) {
+            document.getElementById('connection-status').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
