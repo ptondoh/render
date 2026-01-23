@@ -98,8 +98,33 @@ async def create_indexes() -> None:
         # Index pour la collection marches
         await db.marches.create_index("code", unique=True)
         await db.marches.create_index("commune_id")
+        await db.marches.create_index("actif")
         # Index géospatial pour la recherche par proximité
         await db.marches.create_index([("location", "2dsphere")])
+
+        # Index pour la collection unites_mesure
+        await db.unites_mesure.create_index("unite", unique=True)
+
+        # Index pour la collection categories_produit
+        await db.categories_produit.create_index("nom")
+
+        # Index pour la collection categories_user
+        await db.categories_user.create_index("nom")
+
+        # Index pour la collection permissions
+        await db.permissions.create_index([("nom", 1), ("action", 1)], unique=True)
+
+        # Index pour la collection roles
+        await db.roles.create_index("nom", unique=True)
+
+        # Index pour la collection departements
+        await db.departements.create_index("code", unique=True)
+        await db.departements.create_index("actif")
+
+        # Index pour la collection communes
+        await db.communes.create_index("code", unique=True)
+        await db.communes.create_index("departement_id")
+        await db.communes.create_index("actif")
 
         logger.info("✅ Index MongoDB créés avec succès")
 
@@ -155,3 +180,13 @@ def get_collection(collection_name: str):
     """
     db = get_database()
     return db[collection_name]
+
+
+# Alias pour compatibilité avec les routers
+# Utiliser db.collection au lieu de get_database().collection
+class DatabaseProxy:
+    """Proxy pour accéder à la base de données de manière plus concise"""
+    def __getattr__(self, name):
+        return getattr(get_database(), name)
+
+db = DatabaseProxy()

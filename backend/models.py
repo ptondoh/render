@@ -45,6 +45,9 @@ class UserBase(BaseModel):
     email: EmailStr = Field(..., description="Email de l'utilisateur")
     role: Literal["agent", "décideur", "bailleur"] = Field(..., description="Rôle de l'utilisateur")
     nom: Optional[str] = Field(None, description="Nom complet")
+    prenom: Optional[str] = Field(None, description="Prénom")
+    id_categorie_user: Optional[str] = Field(None, description="ID de la catégorie d'utilisateur")
+    id_role: Optional[str] = Field(None, description="ID du rôle")
     departement_id: Optional[str] = Field(None, description="ID du département d'affectation")
     telephone: Optional[str] = Field(None, description="Numéro de téléphone")
     actif: bool = Field(True, description="Compte actif ou non")
@@ -81,6 +84,75 @@ class UserResponse(UserBase):
 
 
 # ============================================================================
+# Modèles Unité de Mesure
+# ============================================================================
+
+class UniteMesureBase(BaseModel):
+    """Modèle de base pour une unité de mesure"""
+    unite: str = Field(..., description="Nom de l'unité (kg, litre, sac, etc.)")
+    description: Optional[str] = Field(None, description="Description de l'unité")
+
+
+class UniteMesureCreate(UniteMesureBase):
+    """Modèle pour la création d'une unité de mesure"""
+    pass
+
+
+class UniteMesureInDB(UniteMesureBase):
+    """Modèle pour une unité de mesure en base de données"""
+    id: str = Field(alias="_id")
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+
+class UniteMesureResponse(UniteMesureBase):
+    """Modèle de réponse pour une unité de mesure"""
+    id: str
+
+    class Config:
+        populate_by_name = True
+
+
+# ============================================================================
+# Modèles Catégorie de Produit
+# ============================================================================
+
+class CategorieProduitBase(BaseModel):
+    """Modèle de base pour une catégorie de produit"""
+    nom: str = Field(..., description="Nom de la catégorie")
+    nom_creole: Optional[str] = Field(None, description="Nom en créole haïtien")
+    description: Optional[str] = Field(None, description="Description de la catégorie")
+
+
+class CategorieProduitCreate(CategorieProduitBase):
+    """Modèle pour la création d'une catégorie de produit"""
+    pass
+
+
+class CategorieProduitInDB(CategorieProduitBase):
+    """Modèle pour une catégorie de produit en base de données"""
+    id: str = Field(alias="_id")
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+
+class CategorieProduitResponse(CategorieProduitBase):
+    """Modèle de réponse pour une catégorie de produit"""
+    id: str
+
+    class Config:
+        populate_by_name = True
+
+
+# ============================================================================
 # Modèles Produit
 # ============================================================================
 
@@ -89,11 +161,8 @@ class ProduitBase(BaseModel):
     nom: str = Field(..., description="Nom du produit")
     nom_creole: Optional[str] = Field(None, description="Nom en créole haïtien")
     code: str = Field(..., description="Code unique du produit (ex: PROD-RIZ)")
-    categorie: Literal[
-        "cereales", "legumineuses", "huiles", "sucre",
-        "tubercules", "produits_animaux", "fruits_legumes", "autres"
-    ] = Field(..., description="Catégorie du produit")
-    unite: str = Field(..., description="Unité de mesure (kg, litre, unité, etc.)")
+    id_categorie: str = Field(..., description="ID de la catégorie")
+    id_unite_mesure: str = Field(..., description="ID de l'unité de mesure")
     description: Optional[str] = Field(None, description="Description du produit")
 
 
@@ -122,6 +191,90 @@ class ProduitResponse(ProduitBase):
     id: str
     actif: bool
     prix_ref_moyen: Optional[float] = None
+    categorie_nom: Optional[str] = None
+    unite_nom: Optional[str] = None
+
+    class Config:
+        populate_by_name = True
+
+
+# ============================================================================
+# Modèles Département
+# ============================================================================
+
+class DepartementBase(BaseModel):
+    """Modèle de base pour un département"""
+    code: str = Field(..., description="Code unique du département (ex: HT-OU)")
+    nom: str = Field(..., description="Nom du département")
+    nom_creole: Optional[str] = Field(None, description="Nom en créole haïtien")
+
+
+class DepartementCreate(DepartementBase):
+    """Modèle pour la création d'un département"""
+    pass
+
+
+class DepartementInDB(DepartementBase):
+    """Modèle pour un département en base de données"""
+    id: str = Field(alias="_id")
+    actif: bool = True
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+
+class DepartementResponse(DepartementBase):
+    """Modèle de réponse pour un département"""
+    id: str
+    actif: bool
+    nombre_communes: Optional[int] = None
+
+    class Config:
+        populate_by_name = True
+
+
+# ============================================================================
+# Modèles Commune
+# ============================================================================
+
+class CommuneBase(BaseModel):
+    """Modèle de base pour une commune"""
+    code: str = Field(..., description="Code unique de la commune")
+    nom: str = Field(..., description="Nom de la commune")
+    nom_creole: Optional[str] = Field(None, description="Nom en créole haïtien")
+    departement_id: str = Field(..., description="ID du département")
+    type_zone: Literal["urbaine", "peri-urbaine", "rurale"] = Field(
+        "rurale", description="Type de zone"
+    )
+    population: Optional[int] = Field(None, description="Population estimée")
+
+
+class CommuneCreate(CommuneBase):
+    """Modèle pour la création d'une commune"""
+    pass
+
+
+class CommuneInDB(CommuneBase):
+    """Modèle pour une commune en base de données"""
+    id: str = Field(alias="_id")
+    actif: bool = True
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+
+class CommuneResponse(CommuneBase):
+    """Modèle de réponse pour une commune"""
+    id: str
+    actif: bool
+    departement_nom: Optional[str] = None
+    nombre_marches: Optional[int] = None
 
     class Config:
         populate_by_name = True
@@ -134,6 +287,7 @@ class ProduitResponse(ProduitBase):
 class MarcheBase(BaseModel):
     """Modèle de base pour un marché"""
     nom: str = Field(..., description="Nom du marché")
+    nom_creole: Optional[str] = Field(None, description="Nom en créole haïtien")
     code: str = Field(..., description="Code unique du marché (ex: MAR-000001)")
     commune_id: str = Field(..., description="ID de la commune")
     type_marche: Literal["quotidien", "hebdomadaire", "occasionnel"] = Field(
@@ -142,6 +296,9 @@ class MarcheBase(BaseModel):
     latitude: Optional[float] = Field(None, ge=-90, le=90, description="Latitude")
     longitude: Optional[float] = Field(None, ge=-180, le=180, description="Longitude")
     jours_ouverture: Optional[list[str]] = Field(None, description="Jours d'ouverture")
+    specialites: Optional[list[str]] = Field(None, description="Spécialités du marché")
+    telephone: Optional[str] = Field(None, description="Téléphone de contact")
+    email: Optional[EmailStr] = Field(None, description="Email de contact")
 
 
 class MarcheCreate(MarcheBase):
@@ -166,6 +323,113 @@ class MarcheResponse(MarcheBase):
     """Modèle de réponse pour un marché"""
     id: str
     actif: bool
+    commune_nom: Optional[str] = None
+    departement_nom: Optional[str] = None
+
+    class Config:
+        populate_by_name = True
+
+
+# ============================================================================
+# Modèles Permission
+# ============================================================================
+
+class PermissionBase(BaseModel):
+    """Modèle de base pour une permission"""
+    nom: str = Field(..., description="Nom de la permission")
+    action: str = Field(..., description="Action autorisée (ex: create, read, update, delete)")
+    description: Optional[str] = Field(None, description="Description de la permission")
+
+
+class PermissionCreate(PermissionBase):
+    """Modèle pour la création d'une permission"""
+    pass
+
+
+class PermissionInDB(PermissionBase):
+    """Modèle pour une permission en base de données"""
+    id: str = Field(alias="_id")
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+
+class PermissionResponse(PermissionBase):
+    """Modèle de réponse pour une permission"""
+    id: str
+
+    class Config:
+        populate_by_name = True
+
+
+# ============================================================================
+# Modèles Rôle
+# ============================================================================
+
+class RoleBase(BaseModel):
+    """Modèle de base pour un rôle"""
+    nom: str = Field(..., description="Nom du rôle")
+    id_permissions: list[str] = Field(default=[], description="Liste des IDs de permissions")
+    description: Optional[str] = Field(None, description="Description du rôle")
+
+
+class RoleCreate(RoleBase):
+    """Modèle pour la création d'un rôle"""
+    pass
+
+
+class RoleInDB(RoleBase):
+    """Modèle pour un rôle en base de données"""
+    id: str = Field(alias="_id")
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+
+class RoleResponse(RoleBase):
+    """Modèle de réponse pour un rôle"""
+    id: str
+    permissions: Optional[list[PermissionResponse]] = None
+
+    class Config:
+        populate_by_name = True
+
+
+# ============================================================================
+# Modèles Catégorie d'Utilisateur
+# ============================================================================
+
+class CategorieUserBase(BaseModel):
+    """Modèle de base pour une catégorie d'utilisateur"""
+    nom: str = Field(..., description="Nom de la catégorie")
+    description: Optional[str] = Field(None, description="Description de la catégorie")
+
+
+class CategorieUserCreate(CategorieUserBase):
+    """Modèle pour la création d'une catégorie d'utilisateur"""
+    pass
+
+
+class CategorieUserInDB(CategorieUserBase):
+    """Modèle pour une catégorie d'utilisateur en base de données"""
+    id: str = Field(alias="_id")
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+
+class CategorieUserResponse(CategorieUserBase):
+    """Modèle de réponse pour une catégorie d'utilisateur"""
+    id: str
 
     class Config:
         populate_by_name = True

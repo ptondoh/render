@@ -17,7 +17,13 @@ from backend.database import (
     ping_database
 )
 from backend.models import HealthCheckResponse, MessageResponse
-from backend.routers import auth as auth_router
+from backend.routers import (
+    auth as auth_router,
+    referentiels as referentiels_router,
+    territoires as territoires_router,
+    produits as produits_router,
+    marches as marches_router
+)
 
 # Configuration du logging
 logging.basicConfig(
@@ -65,10 +71,12 @@ app = FastAPI(
 
     ## Fonctionnalités Phase 0:
 
-    * **Authentification** - Gestion des utilisateurs avec MFA
+    * **Authentification** - Gestion des utilisateurs avec MFA (8 endpoints)
+    * **Référentiels** - Unités de mesure, catégories, permissions, rôles (10 endpoints)
+    * **Hiérarchie territoriale** - Départements > Communes > Marchés (13 endpoints)
+    * **Produits** - Référentiel des produits alimentaires (5 endpoints)
+    * **Marchés** - Gestion des marchés locaux (6 endpoints)
     * **Collecte de prix** - Collecte de prix sur les marchés (mode hors-ligne supporté)
-    * **Hiérarchie territoriale** - Gestion Département > Commune > Marché
-    * **Produits** - Référentiel des produits alimentaires
     * **Alertes** - Système d'alertes à 4 niveaux (Normal, Surveillance, Alerte, Urgence)
 
     ## Stack Technique:
@@ -77,6 +85,7 @@ app = FastAPI(
     * **Base de données**: MongoDB 8.23
     * **Authentification**: JWT + MFA (TOTP)
     * **Notifications**: SendGrid (email)
+    * **RBAC**: Contrôle d'accès basé sur les rôles (agent, décideur, bailleur)
     """,
     version="0.1.0",
     docs_url="/docs",
@@ -111,6 +120,10 @@ app.add_middleware(
 # ============================================================================
 
 app.include_router(auth_router.router)
+app.include_router(referentiels_router.router)
+app.include_router(territoires_router.router)
+app.include_router(produits_router.router)
+app.include_router(marches_router.router)
 
 
 # ============================================================================

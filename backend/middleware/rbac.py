@@ -196,3 +196,22 @@ def can_view_all_data(user: UserInDB) -> bool:
         True si l'utilisateur peut voir toutes les données
     """
     return user.role in ["décideur", "bailleur"]
+
+
+def require_role(allowed_roles: List[str]):
+    """
+    Factory function pour créer une dépendance qui vérifie les rôles.
+
+    Args:
+        allowed_roles: Liste des rôles autorisés
+
+    Returns:
+        RoleChecker configuré avec les rôles autorisés
+
+    Usage:
+        @router.get("/endpoint", dependencies=[Depends(require_role(["décideur"]))])
+        or
+        @router.get("/endpoint")
+        async def endpoint(user: dict = Depends(require_role(["décideur"]))):
+    """
+    return RoleChecker(allowed_roles)
