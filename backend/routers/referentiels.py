@@ -71,7 +71,6 @@ async def create_unite_mesure(
         )
 
     unite_dict = unite.model_dump()
-    unite_dict["created_at"] = datetime.utcnow()
 
     result = await db.unites_mesure.insert_one(unite_dict)
     created_unite = await db.unites_mesure.find_one({"_id": result.inserted_id})
@@ -123,7 +122,6 @@ async def update_unite_mesure(
         )
 
     unite_dict = unite.model_dump()
-    unite_dict["updated_at"] = datetime.utcnow()
 
     await db.unites_mesure.update_one(
         {"_id": ObjectId(unite_id)},
