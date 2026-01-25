@@ -1,0 +1,16 @@
+{
+  "name": "SAP - Système d'Alerte Précoce",
+  "short_name": "SAP",
+  "description": "Système d'Alerte Précoce pour la sécurité alimentaire en Haïti",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -144,7 +144,18 @@ export function Card({ title, children, footer, className = '' }) {
 /**
  * Composant Modal
  */
-export function Modal({ title, content, onClose, footer, className = '' }) {
+export function Modal({ title, content, onClose, footer, className = '', isOpen, children }) {
+    // Support du nouveau format avec isOpen et children
+    if (isOpen !== undefined && !isOpen) {
+        // Si isOpen est false, ne rien afficher
+        return document.createElement('div'); // Retourner un div vide au lieu d'un textNode
+    }
+
+    // Si children est fourni, l'utiliser comme content
+    if (children && !content) {
+        content = children[0] || children;
+    }
+
     // Overlay
     const overlay = createElement('div', {
         className: 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4',
@@ -203,12 +214,7 @@ export function Modal({ title, content, onClose, footer, className = '' }) {
 
     overlay.appendChild(modal);
 
-    // Ajouter au DOM
-    const container = document.getElementById('modal-container');
-    container.appendChild(overlay);
-
-    // Retourner une fonction pour fermer la modal
-    return () => overlay.remove();
+    return overlay;
 }
 
 /**
