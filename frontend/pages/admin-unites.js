@@ -42,7 +42,7 @@ export default function AdminUnitesPage() {
     // Formulaire
     let formData = {
         unite: '',
-        description: ''
+        symbole: ''
     };
 
     // Header
@@ -67,7 +67,7 @@ export default function AdminUnitesPage() {
             variant: 'primary',
             onClick: () => {
                 editingUnite = null;
-                formData = { unite: '', description: '' };
+                formData = { unite: '', symbole: '' };
                 showModal = true;
                 render();
             }
@@ -221,7 +221,7 @@ export default function AdminUnitesPage() {
                     thead.innerHTML = `
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unité</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Symbole</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     `;
@@ -250,11 +250,11 @@ export default function AdminUnitesPage() {
                         uniteCell.appendChild(uniteBadge);
                         row.appendChild(uniteCell);
 
-                        // Description (affiche le nom/symbole de l'unité)
-                        const descCell = document.createElement('td');
-                        descCell.className = 'px-6 py-4 text-sm text-gray-900';
-                        descCell.textContent = unite.unite;
-                        row.appendChild(descCell);
+                        // Symbole
+                        const symboleCell = document.createElement('td');
+                        symboleCell.className = 'px-6 py-4 text-sm text-gray-900';
+                        symboleCell.textContent = unite.symbole;
+                        row.appendChild(symboleCell);
 
                         // Actions
                         const actionsCell = document.createElement('td');
@@ -308,12 +308,12 @@ export default function AdminUnitesPage() {
         const uniteGroup = document.createElement('div');
         const uniteLabel = document.createElement('label');
         uniteLabel.className = 'block text-sm font-medium text-gray-700 mb-1';
-        uniteLabel.innerHTML = '<span class="text-red-500">*</span> Symbole de l\'unité';
+        uniteLabel.innerHTML = '<span class="text-red-500">*</span> Nom de l\'unité';
 
         const uniteInput = document.createElement('input');
         uniteInput.type = 'text';
         uniteInput.required = true;
-        uniteInput.placeholder = 'kg, L, unité, sac...';
+        uniteInput.placeholder = 'kilogramme, litre, gramme...';
         uniteInput.className = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500';
         uniteInput.value = formData.unite;
         uniteInput.addEventListener('input', (e) => {
@@ -324,24 +324,24 @@ export default function AdminUnitesPage() {
         uniteGroup.appendChild(uniteInput);
         modalContent.appendChild(uniteGroup);
 
-        // Champ Description
-        const descGroup = document.createElement('div');
-        const descLabel = document.createElement('label');
-        descLabel.className = 'block text-sm font-medium text-gray-700 mb-1';
-        descLabel.textContent = 'Description (optionnel)';
+        // Champ Symbole
+        const symboleGroup = document.createElement('div');
+        const symboleLabel = document.createElement('label');
+        symboleLabel.className = 'block text-sm font-medium text-gray-700 mb-1';
+        symboleLabel.textContent = 'Symbole *';
 
-        const descInput = document.createElement('input');
-        descInput.type = 'text';
-        descInput.placeholder = 'Kilogramme, Litre...';
-        descInput.className = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500';
-        descInput.value = formData.description;
-        descInput.addEventListener('input', (e) => {
-            formData.description = e.target.value;
+        const symboleInput = document.createElement('input');
+        symboleInput.type = 'text';
+        symboleInput.placeholder = 'kg, L, g...';
+        symboleInput.className = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500';
+        symboleInput.value = formData.symbole;
+        symboleInput.addEventListener('input', (e) => {
+            formData.symbole = e.target.value;
         });
 
-        descGroup.appendChild(descLabel);
-        descGroup.appendChild(descInput);
-        modalContent.appendChild(descGroup);
+        symboleGroup.appendChild(symboleLabel);
+        symboleGroup.appendChild(symboleInput);
+        modalContent.appendChild(symboleGroup);
 
         // Boutons
         const buttonsDiv = document.createElement('div');
@@ -381,7 +381,7 @@ export default function AdminUnitesPage() {
         editingUnite = unite;
         formData = {
             unite: unite.unite,
-            description: unite.description || ''
+            symbole: unite.symbole || ''
         };
         showModal = true;
         render();
@@ -411,7 +411,15 @@ export default function AdminUnitesPage() {
         // Validation
         if (!formData.unite.trim()) {
             showToast({
-                message: 'Le symbole de l\'unité est obligatoire',
+                message: 'Le nom de l\'unité est obligatoire',
+                type: 'error'
+            });
+            return;
+        }
+
+        if (!formData.symbole.trim()) {
+            showToast({
+                message: 'Le symbole est obligatoire',
                 type: 'error'
             });
             return;
@@ -451,7 +459,7 @@ export default function AdminUnitesPage() {
             const term = searchTerm.toLowerCase();
             filteredUnites = unites.filter(unite =>
                 unite.unite.toLowerCase().includes(term) ||
-                (unite.description && unite.description.toLowerCase().includes(term))
+                (unite.symbole && unite.symbole.toLowerCase().includes(term))
             );
         }
 

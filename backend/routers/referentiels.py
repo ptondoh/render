@@ -2,6 +2,7 @@
 Router pour les données de référence (unités de mesure, catégories, permissions, rôles).
 Accès protégé par authentification JWT et RBAC.
 """
+# Auto-reload trigger
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
@@ -37,7 +38,7 @@ async def get_unites_mesure(current_user: dict = Depends(get_current_user)):
         UniteMesureResponse(
             id=str(unite["_id"]),
             unite=unite["unite"],
-            description=unite.get("description")
+            symbole=unite["symbole"]
         )
         for unite in unites
     ]
@@ -56,12 +57,17 @@ async def create_unite_mesure(
     Créer une nouvelle unité de mesure.
     Réservé aux décideurs.
     """
-    # Vérifier si l'unité existe déjà
-    existing = await db.unites_mesure.find_one({"unite": unite.unite})
+    # Vérifier si l'unité ou le symbole existe déjà
+    existing = await db.unites_mesure.find_one({
+        "$or": [
+            {"unite": unite.unite},
+            {"symbole": unite.symbole}
+        ]
+    })
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"L'unité '{unite.unite}' existe déjà"
+            detail=f"L'unité '{unite.unite}' ou le symbole '{unite.symbole}' existe déjà"
         )
 
     unite_dict = unite.model_dump()
@@ -73,8 +79,101 @@ async def create_unite_mesure(
     return UniteMesureResponse(
         id=str(created_unite["_id"]),
         unite=created_unite["unite"],
-        description=created_unite.get("description")
+        symbole=created_unite["symbole"]
     )
+
+
+@router.put("/unites-mesure/{unite_id}", response_model=UniteMesureResponse)
+async def update_unite_mesure(
+    unite_id: str,
+    unite: UniteMesureCreate,
+    current_user: dict = Depends(require_role(["décideur"]))
+):
+    """
+    Mettre à jour une unité de mesure.
+    Réservé aux décideurs.
+    """
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(unite_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID d'unité invalide"
+        )
+
+    existing = await db.unites_mesure.find_one({"_id": ObjectId(unite_id)})
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unité non trouvée"
+        )
+
+    # Vérifier si le nouveau nom ou symbole n'existe pas déjà
+    duplicate = await db.unites_mesure.find_one({
+        "$or": [
+            {"unite": unite.unite},
+            {"symbole": unite.symbole}
+        ],
+        "_id": {"$ne": ObjectId(unite_id)}
+    })
+    if duplicate:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"L'unité '{unite.unite}' ou le symbole '{unite.symbole}' existe déjà"
+        )
+
+    unite_dict = unite.model_dump()
+    unite_dict["updated_at"] = datetime.utcnow()
+
+    await db.unites_mesure.update_one(
+        {"_id": ObjectId(unite_id)},
+        {"$set": unite_dict}
+    )
+
+    updated_unite = await db.unites_mesure.find_one({"_id": ObjectId(unite_id)})
+
+    return UniteMesureResponse(
+        id=str(updated_unite["_id"]),
+        unite=updated_unite["unite"],
+        symbole=updated_unite["symbole"]
+    )
+
+
+@router.delete("/unites-mesure/{unite_id}", response_model=MessageResponse)
+async def delete_unite_mesure(
+    unite_id: str,
+    current_user: dict = Depends(require_role(["décideur"]))
+):
+    """
+    Supprimer une unité de mesure.
+    Réservé aux décideurs.
+    """
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(unite_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID d'unité invalide"
+        )
+
+    existing = await db.unites_mesure.find_one({"_id": ObjectId(unite_id)})
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unité non trouvée"
+        )
+
+    # Vérifier si l'unité est utilisée
+    produits_using = await db.produits.count_documents({"id_unite_mesure": unite_id})
+    if produits_using > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Impossible de supprimer : {produits_using} produit(s) utilisent cette unité"
+        )
+
+    await db.unites_mesure.delete_one({"_id": ObjectId(unite_id)})
+
+    return MessageResponse(message="Unité supprimée avec succès")
 
 
 # ============================================================================
@@ -132,6 +231,97 @@ async def create_categorie_produit(
         nom_creole=created_cat.get("nom_creole"),
         description=created_cat.get("description")
     )
+
+
+@router.put("/categories-produit/{categorie_id}", response_model=CategorieProduitResponse)
+async def update_categorie_produit(
+    categorie_id: str,
+    categorie: CategorieProduitCreate,
+    current_user: dict = Depends(require_role(["décideur"]))
+):
+    """
+    Mettre à jour une catégorie de produit.
+    Réservé aux décideurs.
+    """
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(categorie_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID de catégorie invalide"
+        )
+
+    existing = await db.categories_produit.find_one({"_id": ObjectId(categorie_id)})
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Catégorie non trouvée"
+        )
+
+    # Vérifier si le nouveau nom n'existe pas déjà
+    duplicate = await db.categories_produit.find_one({
+        "nom": categorie.nom,
+        "_id": {"$ne": ObjectId(categorie_id)}
+    })
+    if duplicate:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"La catégorie '{categorie.nom}' existe déjà"
+        )
+
+    categorie_dict = categorie.model_dump()
+    categorie_dict["updated_at"] = datetime.utcnow()
+
+    await db.categories_produit.update_one(
+        {"_id": ObjectId(categorie_id)},
+        {"$set": categorie_dict}
+    )
+
+    updated_cat = await db.categories_produit.find_one({"_id": ObjectId(categorie_id)})
+
+    return CategorieProduitResponse(
+        id=str(updated_cat["_id"]),
+        nom=updated_cat["nom"],
+        nom_creole=updated_cat.get("nom_creole"),
+        description=updated_cat.get("description")
+    )
+
+
+@router.delete("/categories-produit/{categorie_id}", response_model=MessageResponse)
+async def delete_categorie_produit(
+    categorie_id: str,
+    current_user: dict = Depends(require_role(["décideur"]))
+):
+    """
+    Supprimer une catégorie de produit.
+    Réservé aux décideurs.
+    """
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(categorie_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID de catégorie invalide"
+        )
+
+    existing = await db.categories_produit.find_one({"_id": ObjectId(categorie_id)})
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Catégorie non trouvée"
+        )
+
+    # Vérifier si la catégorie est utilisée
+    produits_using = await db.produits.count_documents({"id_categorie": categorie_id})
+    if produits_using > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Impossible de supprimer : {produits_using} produit(s) utilisent cette catégorie"
+        )
+
+    await db.categories_produit.delete_one({"_id": ObjectId(categorie_id)})
+
+    return MessageResponse(message="Catégorie supprimée avec succès")
 
 
 # ============================================================================

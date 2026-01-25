@@ -89,8 +89,8 @@ class UserResponse(UserBase):
 
 class UniteMesureBase(BaseModel):
     """Modèle de base pour une unité de mesure"""
-    unite: str = Field(..., description="Nom de l'unité (kg, litre, sac, etc.)")
-    description: Optional[str] = Field(None, description="Description de l'unité")
+    unite: str = Field(..., description="Nom complet de l'unité (kilogramme, litre, sac, etc.)")
+    symbole: str = Field(..., description="Symbole de l'unité (kg, L, sac, etc.)")
 
 
 class UniteMesureCreate(UniteMesureBase):
@@ -443,6 +443,8 @@ class CollecteBase(BaseModel):
     """Modèle de base pour une collecte de prix"""
     marche_id: str = Field(..., description="ID du marché")
     produit_id: str = Field(..., description="ID du produit")
+    unite_id: str = Field(..., description="ID de l'unité de mesure")
+    quantite: float = Field(..., gt=0, description="Quantité (> 0)")
     prix: float = Field(..., ge=0, description="Prix collecté (>= 0)")
     date: datetime = Field(..., description="Date de la collecte")
     commentaire: Optional[str] = Field(None, description="Commentaire optionnel")
@@ -479,6 +481,9 @@ class CollecteResponse(CollecteBase):
     agent_id: str
     statut: str
     created_at: datetime
+    unite_nom: Optional[str] = None
+    marche_nom: Optional[str] = None
+    produit_nom: Optional[str] = None
 
     class Config:
         populate_by_name = True
