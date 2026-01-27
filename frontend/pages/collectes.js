@@ -357,20 +357,30 @@ export default function CollectesPage() {
 
         // Table header avec 7 colonnes (ajout de la colonne Actions)
         const table = document.createElement('table');
-        table.className = 'w-full border-collapse';
+        table.className = 'w-full border-collapse table-fixed';
+        table.style.tableLayout = 'fixed'; // Force fixed layout
+
+        // Définir les largeurs avec colgroup (total ~1166px pour remplir l'écran)
+        const headers = ['Produit', 'Unité', 'Matin 1', 'Matin 2', 'Soir 1', 'Soir 2', 'Actions'];
+        const widths = ['130px', '80px', '215px', '215px', '215px', '215px', '96px'];
+
+        const colgroup = document.createElement('colgroup');
+        widths.forEach(width => {
+            const col = document.createElement('col');
+            col.style.width = width;
+            colgroup.appendChild(col);
+        });
+        table.appendChild(colgroup);
 
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
         headerRow.className = 'bg-indigo-600 text-white';
 
-        const headers = ['Produit', 'Unité', 'Matin 1', 'Matin 2', 'Soir 1', 'Soir 2', 'Actions'];
-        // Largeurs : Produit et Unité normales, périodes réduites car inputs de 5 chiffres
-        const widths = ['w-1/5', 'w-1/12', 'w-20', 'w-20', 'w-20', 'w-20', 'w-16'];
-
         headers.forEach((headerText, index) => {
             const th = document.createElement('th');
-            th.className = `${widths[index]} p-2 text-xs font-bold uppercase tracking-wide border border-indigo-700 ${index === 0 ? 'text-left' : 'text-center'}`;
+            th.className = `p-2 text-xs font-bold uppercase tracking-wide border border-indigo-700 ${index === 0 ? 'text-left' : 'text-center'}`;
             th.textContent = headerText;
+
             headerRow.appendChild(th);
         });
 
@@ -597,9 +607,11 @@ export default function CollectesPage() {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            // Sans l'attribut capture, le navigateur propose automatiquement :
-            // - Prendre une photo (caméra)
-            // - Choisir depuis la galerie/fichiers
+
+            // IMPORTANT: Sans attribut 'capture', sur mobile moderne (iOS/Android récent):
+            // - Le navigateur propose automatiquement "Prendre une photo" ET "Choisir depuis galerie"
+            // Sur desktop: propose uniquement "Choisir un fichier"
+            // C'est le comportement standard et correct!
 
             input.addEventListener('change', async (e) => {
                 const file = e.target.files[0];
@@ -656,24 +668,26 @@ export default function CollectesPage() {
             };
         }
 
-        // Colonne 1: Nom du produit
+        // Colonne 1: Nom du produit (largeur contrôlée par table-layout: fixed)
         const nameCell = document.createElement('td');
-        nameCell.className = 'p-3 pl-4 border border-gray-300 text-left bg-white';
+        nameCell.className = 'p-2 pl-3 border border-gray-300 text-left bg-white overflow-hidden';
 
         const namePara = document.createElement('p');
-        namePara.className = 'font-semibold text-gray-800 text-sm';
+        namePara.className = 'font-semibold text-gray-800 text-xs truncate';
         namePara.textContent = produit.nom;
+        namePara.title = produit.nom; // Tooltip pour voir le nom complet
 
         nameCell.appendChild(namePara);
         row.appendChild(nameCell);
 
-        // Colonne 2: Unité de mesure
+        // Colonne 2: Unité de mesure (largeur contrôlée par table-layout: fixed)
         const uniteCell = document.createElement('td');
-        uniteCell.className = 'p-2 border border-gray-300 text-center bg-white';
+        uniteCell.className = 'p-1 border border-gray-300 text-center bg-white overflow-hidden';
 
         const unitePara = document.createElement('p');
-        unitePara.className = 'text-xs font-medium text-indigo-700 bg-indigo-50 px-2 py-1 rounded inline-block';
+        unitePara.className = 'text-xs font-medium text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded inline-block truncate max-w-full';
         unitePara.textContent = produit.unite_nom || produit.unite_symbole || 'N/A';
+        unitePara.title = produit.unite_nom || produit.unite_symbole || 'N/A'; // Tooltip
 
         uniteCell.appendChild(unitePara);
         row.appendChild(uniteCell);
@@ -693,17 +707,19 @@ export default function CollectesPage() {
             const inputCell = document.createElement('td');
             inputCell.className = 'p-1 border border-gray-300 bg-white';
 
-            // Conteneur flex pour input + boutons (plus compact)
+            // Conteneur inline-flex pour input + boutons (éviter l'étirement)
             const container = document.createElement('div');
-            container.className = 'flex items-center gap-0.5';
+            container.className = 'inline-flex items-center justify-center gap-1';
 
             const input = document.createElement('input');
             input.type = 'number';
             input.step = '0.01';
             input.min = '0';
             input.maxLength = 5; // Limiter à 5 chiffres
-            input.placeholder = '';
-            input.className = 'w-12 rounded border-gray-300 p-1 border text-center text-xs focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500';
+            input.placeholder = periode.placeholder;
+            input.className = 'flex-shrink-0 rounded border-gray-300 p-2 border text-center text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500';
+            input.style.width = '72px'; // Largeur augmentée
+            input.style.maxWidth = '72px';
             input.setAttribute('data-periode', periode.key);
             input.setAttribute('data-produit-id', produit.id);
 
@@ -711,7 +727,9 @@ export default function CollectesPage() {
             const existing = existingCollectes[`${produit.id}_${periode.key}`];
             if (existing) {
                 input.value = existing.prix;
-                input.className = 'w-12 rounded p-1 border text-center text-xs bg-green-50 border-green-400 focus:ring-1 focus:ring-green-500';
+                input.className = 'flex-shrink-0 rounded p-2 border text-center text-sm bg-green-50 border-green-400 focus:ring-1 focus:ring-green-500';
+                input.style.width = '72px'; // Largeur augmentée
+                input.style.maxWidth = '72px';
                 input.setAttribute('data-existing', 'true');
                 input.setAttribute('data-collecte-id', existing.id);
                 input.disabled = true; // Désactiver si déjà enregistré
@@ -734,8 +752,8 @@ export default function CollectesPage() {
                 const photoButton = document.createElement('button');
                 photoButton.type = 'button';
                 photoButton.className = hasPhoto
-                    ? 'px-3 py-1.5 bg-blue-600 text-white text-base rounded hover:bg-blue-700 transition shadow-sm'
-                    : 'px-3 py-1.5 bg-gray-400 text-white text-base rounded hover:bg-gray-500 transition shadow-sm';
+                    ? 'flex-shrink-0 px-4 py-2 bg-blue-600 text-white text-xl rounded hover:bg-blue-700 transition shadow-sm'
+                    : 'flex-shrink-0 px-4 py-2 bg-gray-400 text-white text-xl rounded hover:bg-gray-500 transition shadow-sm';
                 photoButton.innerHTML = '📷';
                 photoButton.title = hasPhoto ? 'Photo capturée - Cliquer pour changer' : 'Prendre photo ou choisir image';
 
@@ -748,7 +766,7 @@ export default function CollectesPage() {
                 // Bouton ajouter "+"
                 const addButton = document.createElement('button');
                 addButton.type = 'button';
-                addButton.className = 'px-3 py-1.5 bg-green-600 text-white text-base rounded hover:bg-green-700 transition font-bold shadow-sm';
+                addButton.className = 'flex-shrink-0 px-3 py-1.5 bg-green-600 text-white text-lg rounded hover:bg-green-700 transition font-bold shadow-sm';
                 addButton.innerHTML = '+';
                 addButton.title = `Enregistrer ${periode.placeholder}`;
 
@@ -791,12 +809,12 @@ export default function CollectesPage() {
         const row = document.createElement('tr');
         row.className = 'bg-yellow-50 border-2 border-yellow-400';
 
-        // Colonne 1: Select de produit
+        // Colonne 1: Select de produit (largeur contrôlée par table-layout: fixed)
         const produitCell = document.createElement('td');
-        produitCell.className = 'p-2 border border-gray-300';
+        produitCell.className = 'p-2 border border-gray-300 overflow-hidden';
 
         const produitSelect = document.createElement('select');
-        produitSelect.className = 'w-full p-2 border border-yellow-500 rounded text-sm focus:ring-2 focus:ring-yellow-600';
+        produitSelect.className = 'w-full p-1.5 border border-yellow-500 rounded text-xs focus:ring-2 focus:ring-yellow-600 truncate';
 
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
@@ -829,12 +847,12 @@ export default function CollectesPage() {
         produitCell.appendChild(produitSelect);
         row.appendChild(produitCell);
 
-        // Colonne 2: Select d'unité
+        // Colonne 2: Select d'unité (largeur contrôlée par table-layout: fixed)
         const uniteCell = document.createElement('td');
-        uniteCell.className = 'p-2 border border-gray-300 text-center';
+        uniteCell.className = 'p-1 border border-gray-300 text-center overflow-hidden';
 
         const uniteSelect = document.createElement('select');
-        uniteSelect.className = 'w-full p-2 border border-yellow-500 rounded text-sm focus:ring-2 focus:ring-yellow-600';
+        uniteSelect.className = 'w-full p-1.5 border border-yellow-500 rounded text-xs focus:ring-2 focus:ring-yellow-600 truncate';
 
         const defaultUniteOption = document.createElement('option');
         defaultUniteOption.value = '';
