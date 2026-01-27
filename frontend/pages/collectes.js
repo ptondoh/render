@@ -37,7 +37,8 @@ export default function CollectesPage() {
         marche_id: '',
         date: new Date().toISOString().split('T')[0],
         commentaire: '',
-        prix: {} // Format: { produit_id: { matin1: '', matin2: '', soir1: '', soir2: '' } }
+        prix: {}, // Format: { produit_id: { matin1: '', matin2: '', soir1: '', soir2: '' } }
+        photos: {} // Format: { 'produit_id_periode': 'data:image/jpeg;base64,...' }
     };
 
     // Header
@@ -59,76 +60,165 @@ export default function CollectesPage() {
         return header;
     }
 
-    // Section GPS et sélection marché
+    // Variables globales pour la carte
+    let map = null;
+    let userMarker = null;
+    let marcheMarker = null;
+
+    // Section GPS et sélection marché (Tableau 2 colonnes)
     function renderLocationSection() {
         const section = document.createElement('div');
-        section.className = 'bg-white rounded-xl shadow-xl p-6 space-y-6';
+        section.className = 'bg-white rounded-xl shadow-xl p-6';
 
-        // Position GPS
-        const gpsDiv = document.createElement('div');
-        gpsDiv.className = 'space-y-3';
+        // Tableau 2 colonnes : 1 = Carte, 2 = Contrôles (empilés verticalement)
+        const table = document.createElement('div');
+        table.className = 'grid grid-cols-1 md:grid-cols-2 gap-6';
 
-        const gpsHeader = document.createElement('div');
-        gpsHeader.className = 'flex justify-between items-center';
+        // ===== COLONNE 1 : CARTE GPS =====
+        const mapColumn = document.createElement('div');
+        mapColumn.className = 'space-y-3';
 
-        const gpsLabel = document.createElement('label');
-        gpsLabel.className = 'font-bold text-gray-700 text-sm flex items-center';
+        // Header carte
+        const mapHeader = document.createElement('div');
+        mapHeader.className = 'flex justify-between items-center mb-3';
+
+        const mapLabel = document.createElement('label');
+        mapLabel.className = 'font-bold text-gray-700 text-sm flex items-center';
         const badge = document.createElement('span');
-        badge.className = 'bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2';
-        badge.textContent = '1';
-        gpsLabel.appendChild(badge);
-        gpsLabel.appendChild(document.createTextNode('Position GPS'));
+        badge.className = 'bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2';
+        badge.textContent = '📍';
+        mapLabel.appendChild(badge);
+        mapLabel.appendChild(document.createTextNode('Carte GPS'));
 
         const gpsStatus = document.createElement('span');
-        gpsStatus.id = 'gpsStatus';
         gpsStatus.className = 'text-xs font-bold';
 
         if (isFetchingPosition) {
             gpsStatus.className += ' text-orange-500 animate-pulse';
-            gpsStatus.textContent = 'Recherche...';
+            gpsStatus.textContent = 'Recherche GPS...';
         } else if (userPosition) {
-            gpsStatus.className += ' text-green-500';
-            gpsStatus.textContent = '✓ Obtenue';
+            gpsStatus.className += ' text-green-600';
+            gpsStatus.textContent = '✓ GPS Obtenu';
         } else {
             gpsStatus.className += ' text-gray-400';
-            gpsStatus.textContent = 'Non disponible';
+            gpsStatus.textContent = 'GPS indisponible';
         }
 
-        gpsHeader.appendChild(gpsLabel);
-        gpsHeader.appendChild(gpsStatus);
-        gpsDiv.appendChild(gpsHeader);
+        mapHeader.appendChild(mapLabel);
+        mapHeader.appendChild(gpsStatus);
+        mapColumn.appendChild(mapHeader);
 
-        // Bouton obtenir GPS
-        if (!userPosition && !isFetchingPosition) {
-            const gpsButton = Button({
-                text: '📍 Obtenir ma position GPS',
-                variant: 'secondary',
-                onClick: handleGetLocation
-            });
-            gpsDiv.appendChild(gpsButton);
-        }
+        // Container pour la carte (forcer la hauteur en inline style)
+        const mapContainer = document.createElement('div');
+        mapContainer.id = 'map-container';
+        mapContainer.className = 'w-full rounded-lg border-2 border-gray-300 bg-gray-100';
+        mapContainer.style.height = '400px';  // Forcer la hauteur
+        mapContainer.style.minHeight = '400px';
+        mapColumn.appendChild(mapContainer);
 
-        // Afficher coordonnées si disponibles
-        if (userPosition) {
-            const coordsDiv = document.createElement('div');
-            coordsDiv.className = 'text-sm text-gray-600 bg-green-50 p-3 rounded-lg';
-            coordsDiv.innerHTML = `
-                <div class="font-semibold text-green-700 mb-1">Position capturée:</div>
-                <div>Latitude: ${userPosition.latitude.toFixed(6)}</div>
-                <div>Longitude: ${userPosition.longitude.toFixed(6)}</div>
-            `;
-            gpsDiv.appendChild(coordsDiv);
-        }
+        // Initialiser ou mettre à jour la carte (délai pour que le container soit dans le DOM)
+        setTimeout(() => {
+            // Vérifier si le container existe
+            const container = document.getElementById('map-container');
+            if (!container) {
+                console.error('Container map-container non trouvé');
+                return;
+            }
 
-        section.appendChild(gpsDiv);
+            // Si la carte existe déjà, la supprimer pour recréer
+            if (map) {
+                map.remove();
+                map = null;
+                userMarker = null;
+                marcheMarker = null;
+            }
 
-        // Sélection du marché
-        const marcheDiv = document.createElement('div');
-        marcheDiv.className = 'space-y-2';
+            // Créer la carte centrée sur Haïti
+            const center = userPosition
+                ? [userPosition.latitude, userPosition.longitude]
+                : [18.5944, -72.3074]; // Port-au-Prince par défaut
 
-        const marcheLabel = document.createElement('label');
-        marcheLabel.className = 'block text-sm font-bold text-gray-700';
-        marcheLabel.innerHTML = '<span class="text-red-500">*</span> Sélectionner le Marché';
+            map = L.map('map-container').setView(center, userPosition ? 13 : 10);
+
+            // Ajouter la couche de tuiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Ajouter/Mettre à jour le marqueur de l'utilisateur
+            if (userPosition) {
+                if (!userMarker) {
+                    userMarker = L.marker([userPosition.latitude, userPosition.longitude], {
+                        icon: L.icon({
+                            iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41],
+                            popupAnchor: [1, -34],
+                            shadowSize: [41, 41]
+                        })
+                    })
+                    .addTo(map)
+                    .bindPopup('📍 Votre position');
+                } else {
+                    userMarker.setLatLng([userPosition.latitude, userPosition.longitude]);
+                }
+            }
+
+            // Nettoyer l'ancien marqueur du marché
+            if (marcheMarker) {
+                map.removeLayer(marcheMarker);
+                marcheMarker = null;
+            }
+
+            // Ajouter le nouveau marqueur du marché sélectionné
+            if (formData.marche_id) {
+                const marche = marches.find(m => m.id === formData.marche_id);
+                if (marche && marche.latitude && marche.longitude) {
+                    marcheMarker = L.marker([marche.latitude, marche.longitude], {
+                        icon: L.icon({
+                            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41],
+                            popupAnchor: [1, -34],
+                            shadowSize: [41, 41]
+                        })
+                    })
+                    .addTo(map)
+                    .bindPopup(`<b>🏪 ${marche.nom}</b><br>${marche.commune_nom}`)
+                    .openPopup();
+
+                    // Centrer sur le marché avec zoom approprié
+                    map.setView([marche.latitude, marche.longitude], 14);
+                } else if (userPosition) {
+                    // Si pas de marché sélectionné, centrer sur l'utilisateur
+                    map.setView([userPosition.latitude, userPosition.longitude], 13);
+                }
+            } else if (userPosition) {
+                // Pas de marché, centrer sur l'utilisateur
+                map.setView([userPosition.latitude, userPosition.longitude], 13);
+            }
+        }, 300);  // Augmenté à 300ms pour laisser le temps au container d'être dans le DOM
+
+        table.appendChild(mapColumn);
+
+        // ===== COLONNE 2 : CONTRÔLES (2 lignes verticales) =====
+        const controlsColumn = document.createElement('div');
+        controlsColumn.className = 'flex flex-col justify-start gap-6';
+        controlsColumn.style.display = 'flex';
+        controlsColumn.style.flexDirection = 'column';
+        controlsColumn.style.gap = '24px';
+
+        // LIGNE 1 (en haut) : Sélection du marché
+        const marcheDiv2 = document.createElement('div');
+        marcheDiv2.className = 'space-y-3 w-full';
+        marcheDiv2.style.width = '100%';
+
+        const marcheLabel2 = document.createElement('label');
+        marcheLabel2.className = 'block text-sm font-bold text-gray-700';
+        marcheLabel2.innerHTML = '<span class="text-red-500">*</span> Sélectionner le Marché';
 
         const marcheSelect = document.createElement('select');
         marcheSelect.className = 'w-full rounded-lg border-gray-300 p-3 border focus:ring-2 focus:ring-blue-500 bg-white shadow-sm disabled:bg-gray-100 transition';
@@ -187,14 +277,15 @@ export default function CollectesPage() {
             ? 'Les marchés les plus proches s\'affichent en premier.'
             : 'Veuillez obtenir votre position GPS pour activer la sélection.';
 
-        marcheDiv.appendChild(marcheLabel);
-        marcheDiv.appendChild(marcheSelect);
-        marcheDiv.appendChild(marcheHint);
-        section.appendChild(marcheDiv);
+        marcheDiv2.appendChild(marcheLabel2);
+        marcheDiv2.appendChild(marcheSelect);
+        marcheDiv2.appendChild(marcheHint);
+        controlsColumn.appendChild(marcheDiv2);
 
-        // Date de collecte
+        // LIGNE 2 (en bas) : Date de collecte
         const dateDiv = document.createElement('div');
-        dateDiv.className = 'space-y-2';
+        dateDiv.className = 'space-y-3 w-full';
+        dateDiv.style.width = '100%';
 
         const dateLabel = document.createElement('label');
         dateLabel.className = 'block text-sm font-bold text-gray-700';
@@ -215,7 +306,13 @@ export default function CollectesPage() {
 
         dateDiv.appendChild(dateLabel);
         dateDiv.appendChild(dateInput);
-        section.appendChild(dateDiv);
+        controlsColumn.appendChild(dateDiv);
+
+        // Ajouter la colonne contrôles au tableau
+        table.appendChild(controlsColumn);
+
+        // Ajouter le tableau à la section
+        section.appendChild(table);
 
         return section;
     }
@@ -255,7 +352,8 @@ export default function CollectesPage() {
         tableWrapper.className = 'overflow-x-auto bg-white border border-gray-200 rounded-lg shadow-sm';
 
         const tableContainer = document.createElement('div');
-        tableContainer.className = 'min-w-[768px]';
+        // Pas de min-width pour s'adapter à tous les écrans
+        tableContainer.className = '';
 
         // Table header avec 7 colonnes (ajout de la colonne Actions)
         const table = document.createElement('table');
@@ -266,11 +364,12 @@ export default function CollectesPage() {
         headerRow.className = 'bg-indigo-600 text-white';
 
         const headers = ['Produit', 'Unité', 'Matin 1', 'Matin 2', 'Soir 1', 'Soir 2', 'Actions'];
-        const widths = ['w-1/5', 'w-1/12', 'w-1/7', 'w-1/7', 'w-1/7', 'w-1/7', 'w-1/12'];
+        // Largeurs : Produit et Unité normales, périodes réduites car inputs de 5 chiffres
+        const widths = ['w-1/5', 'w-1/12', 'w-20', 'w-20', 'w-20', 'w-20', 'w-16'];
 
         headers.forEach((headerText, index) => {
             const th = document.createElement('th');
-            th.className = `${widths[index]} p-3 text-sm font-bold uppercase tracking-wider border border-indigo-700 ${index === 0 ? 'text-left' : 'text-center'}`;
+            th.className = `${widths[index]} p-2 text-xs font-bold uppercase tracking-wide border border-indigo-700 ${index === 0 ? 'text-left' : 'text-center'}`;
             th.textContent = headerText;
             headerRow.appendChild(th);
         });
@@ -301,17 +400,17 @@ export default function CollectesPage() {
             emptyRow.appendChild(emptyCell);
             tbody.appendChild(emptyRow);
         } else {
+            // Ligne d'ajout de produit EN PREMIER (si activé)
+            if (showAddProductForm) {
+                const addRow = renderAddProductRow();
+                tbody.appendChild(addRow);
+            }
+
             // Afficher les produits de la page actuelle
             paginatedProduits.forEach(produit => {
                 const row = renderProductRow(produit);
                 tbody.appendChild(row);
             });
-
-            // Ligne d'ajout de produit (si activé)
-            if (showAddProductForm) {
-                const addRow = renderAddProductRow();
-                tbody.appendChild(addRow);
-            }
         }
 
         table.appendChild(tbody);
@@ -491,6 +590,57 @@ export default function CollectesPage() {
         return section;
     }
 
+    // Fonction pour capturer une photo ou choisir une image
+    function capturePhoto(produitId, periode) {
+        return new Promise((resolve, reject) => {
+            // Créer un input file invisible
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            // Sans l'attribut capture, le navigateur propose automatiquement :
+            // - Prendre une photo (caméra)
+            // - Choisir depuis la galerie/fichiers
+
+            input.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) {
+                    resolve(null);
+                    return;
+                }
+
+                // Vérifier la taille (max 2MB)
+                if (file.size > 2 * 1024 * 1024) {
+                    showToast({
+                        message: 'Image trop grande (max 2MB)',
+                        type: 'warning'
+                    });
+                    resolve(null);
+                    return;
+                }
+
+                // Convertir en base64
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const photoKey = `${produitId}_${periode}`;
+                    formData.photos[photoKey] = reader.result;
+
+                    showToast({
+                        message: '📷 Photo capturée',
+                        type: 'success'
+                    });
+
+                    render(); // Rafraîchir pour afficher l'icône
+                    resolve(reader.result);
+                };
+                reader.onerror = () => reject(reader.error);
+                reader.readAsDataURL(file);
+            });
+
+            // Déclencher le sélecteur de fichier
+            input.click();
+        });
+    }
+
     // Ligne de produit avec 6 colonnes (tr avec td)
     function renderProductRow(produit) {
         const row = document.createElement('tr');
@@ -506,9 +656,9 @@ export default function CollectesPage() {
             };
         }
 
-        // Colonne 1: Nom du produit (avec plus de padding)
+        // Colonne 1: Nom du produit
         const nameCell = document.createElement('td');
-        nameCell.className = 'p-4 pl-6 border border-gray-300 text-left bg-white';
+        nameCell.className = 'p-3 pl-4 border border-gray-300 text-left bg-white';
 
         const namePara = document.createElement('p');
         namePara.className = 'font-semibold text-gray-800 text-sm';
@@ -519,7 +669,7 @@ export default function CollectesPage() {
 
         // Colonne 2: Unité de mesure
         const uniteCell = document.createElement('td');
-        uniteCell.className = 'p-3 border border-gray-300 text-center bg-white';
+        uniteCell.className = 'p-2 border border-gray-300 text-center bg-white';
 
         const unitePara = document.createElement('p');
         unitePara.className = 'text-xs font-medium text-indigo-700 bg-indigo-50 px-2 py-1 rounded inline-block';
@@ -541,18 +691,19 @@ export default function CollectesPage() {
 
         periodes.forEach(periode => {
             const inputCell = document.createElement('td');
-            inputCell.className = 'p-2 border border-gray-300 bg-white';
+            inputCell.className = 'p-1 border border-gray-300 bg-white';
 
-            // Conteneur flex pour input + bouton
+            // Conteneur flex pour input + boutons (plus compact)
             const container = document.createElement('div');
-            container.className = 'flex items-center gap-1';
+            container.className = 'flex items-center gap-0.5';
 
             const input = document.createElement('input');
             input.type = 'number';
             input.step = '0.01';
             input.min = '0';
-            input.placeholder = periode.placeholder;
-            input.className = 'flex-1 rounded border-gray-300 p-2 border text-center text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
+            input.maxLength = 5; // Limiter à 5 chiffres
+            input.placeholder = '';
+            input.className = 'w-12 rounded border-gray-300 p-1 border text-center text-xs focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500';
             input.setAttribute('data-periode', periode.key);
             input.setAttribute('data-produit-id', produit.id);
 
@@ -560,7 +711,7 @@ export default function CollectesPage() {
             const existing = existingCollectes[`${produit.id}_${periode.key}`];
             if (existing) {
                 input.value = existing.prix;
-                input.className = 'flex-1 rounded p-2 border text-center text-sm bg-green-50 border-green-400 focus:ring-2 focus:ring-green-500';
+                input.className = 'w-12 rounded p-1 border text-center text-xs bg-green-50 border-green-400 focus:ring-1 focus:ring-green-500';
                 input.setAttribute('data-existing', 'true');
                 input.setAttribute('data-collecte-id', existing.id);
                 input.disabled = true; // Désactiver si déjà enregistré
@@ -574,11 +725,30 @@ export default function CollectesPage() {
 
             container.appendChild(input);
 
-            // Bouton "Ajouter" si pas encore de collecte pour cette période
+            // Boutons si pas encore de collecte pour cette période
             if (!existing) {
+                // Bouton photo 📷
+                const photoKey = `${produit.id}_${periode.key}`;
+                const hasPhoto = formData.photos[photoKey];
+
+                const photoButton = document.createElement('button');
+                photoButton.type = 'button';
+                photoButton.className = hasPhoto
+                    ? 'px-3 py-1.5 bg-blue-600 text-white text-base rounded hover:bg-blue-700 transition shadow-sm'
+                    : 'px-3 py-1.5 bg-gray-400 text-white text-base rounded hover:bg-gray-500 transition shadow-sm';
+                photoButton.innerHTML = '📷';
+                photoButton.title = hasPhoto ? 'Photo capturée - Cliquer pour changer' : 'Prendre photo ou choisir image';
+
+                photoButton.addEventListener('click', async () => {
+                    await capturePhoto(produit.id, periode.key);
+                });
+
+                container.appendChild(photoButton);
+
+                // Bouton ajouter "+"
                 const addButton = document.createElement('button');
                 addButton.type = 'button';
-                addButton.className = 'px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition';
+                addButton.className = 'px-3 py-1.5 bg-green-600 text-white text-base rounded hover:bg-green-700 transition font-bold shadow-sm';
                 addButton.innerHTML = '+';
                 addButton.title = `Enregistrer ${periode.placeholder}`;
 
@@ -595,13 +765,13 @@ export default function CollectesPage() {
 
         // Colonne 7: Actions (bouton Modifier si au moins une collecte existe)
         const actionsCell = document.createElement('td');
-        actionsCell.className = 'p-2 border border-gray-300 bg-white text-center';
+        actionsCell.className = 'p-1 border border-gray-300 bg-white text-center';
 
         if (hasAnyCollecte) {
             const modifyButton = document.createElement('button');
             modifyButton.type = 'button';
-            modifyButton.className = 'px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition font-semibold';
-            modifyButton.textContent = 'Modifier';
+            modifyButton.className = 'px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition';
+            modifyButton.textContent = '✏️';
             modifyButton.title = 'Modifier les collectes de ce produit';
 
             modifyButton.addEventListener('click', () => {
@@ -1020,8 +1190,20 @@ export default function CollectesPage() {
             collecteData.longitude = userPosition.longitude;
         }
 
+        // Ajouter la photo si disponible
+        const photoKey = `${produit.id}_${periode}`;
+        if (formData.photos[photoKey]) {
+            collecteData.image = formData.photos[photoKey];
+        }
+
         try {
             await api.post('/api/collectes', collecteData);
+
+            // Supprimer la photo de la mémoire après enregistrement réussi
+            const photoKey = `${produit.id}_${periode}`;
+            if (formData.photos[photoKey]) {
+                delete formData.photos[photoKey];
+            }
 
             showToast({
                 message: `Prix ${periode} enregistré pour ${produit.nom}`,
@@ -1332,6 +1514,13 @@ export default function CollectesPage() {
 
     // Charger les données au montage
     loadData();
+
+    // Obtenir automatiquement la position GPS au chargement
+    setTimeout(() => {
+        if (!userPosition && !isFetchingPosition) {
+            handleGetLocation();
+        }
+    }, 500);
 
     // Rendu initial
     render();

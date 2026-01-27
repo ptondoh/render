@@ -450,6 +450,7 @@ class CollecteBase(BaseModel):
     date: datetime = Field(..., description="Date de la collecte")
     periode: Optional[Literal["matin1", "matin2", "soir1", "soir2"]] = Field(None, description="Période de collecte (4 périodes par jour)")
     commentaire: Optional[str] = Field(None, description="Commentaire optionnel")
+    image: Optional[str] = Field(None, description="Photo du produit (base64)")
 
 
 class CollecteCreate(CollecteBase):
@@ -491,6 +492,7 @@ class CollecteResponse(CollecteBase):
     periode: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    image: Optional[str] = None
     created_at: datetime
     unite_nom: Optional[str] = None
     marche_nom: Optional[str] = None
