@@ -78,7 +78,8 @@ async def get_marches(
                 email=marche.get("email"),
                 actif=marche.get("actif", True),
                 commune_nom=commune_nom,
-                departement_nom=departement_nom
+                departement_nom=departement_nom,
+                produits=marche.get("produits", [])
             )
         )
 

@@ -49,9 +49,8 @@ const routes = {
         title: 'Collectes de prix - SAP',
         requireAuth: true,
         render: async () => {
-            // const { default: CollectesPage } = await import('./pages/collectes.js');
-            // return CollectesPage();
-            return '<div class="text-center py-12"><h2 class="text-2xl font-bold text-gray-900 mb-4">Page Collectes</h2><p class="text-gray-600">À venir - Section 8</p></div>';
+            const { default: CollectesPage } = await import('./pages/collectes.js');
+            return CollectesPage();
         }
     },
     '/alertes': {
@@ -68,6 +67,38 @@ const routes = {
         requireAuth: true,
         render: async () => {
             return '<div class="text-center py-12"><h2 class="text-2xl font-bold text-gray-900 mb-4">Mon Profil</h2><p class="text-gray-600">À venir</p></div>';
+        }
+    },
+    '/admin/unites': {
+        title: 'Gestion Unités - SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: AdminUnitesPage } = await import('./pages/admin-unites.js');
+            return AdminUnitesPage();
+        }
+    },
+    '/admin/categories': {
+        title: 'Gestion Catégories - SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: AdminCategoriesPage } = await import('./pages/admin-categories.js');
+            return AdminCategoriesPage();
+        }
+    },
+    '/admin/produits': {
+        title: 'Gestion Produits - SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: AdminProduitsPage } = await import('./pages/admin-produits.js');
+            return AdminProduitsPage();
+        }
+    },
+    '/admin/marches': {
+        title: 'Gestion Marchés - SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: AdminMarchesPage } = await import('./pages/admin-marches.js');
+            return AdminMarchesPage();
         }
     },
     '404': {
@@ -113,11 +144,36 @@ class Router {
             userMenuButton.addEventListener('click', (e) => {
                 e.stopPropagation();
                 userMenuDropdown.classList.toggle('hidden');
+                // Fermer le menu admin si ouvert
+                const adminDropdown = document.getElementById('admin-menu-dropdown');
+                if (adminDropdown) {
+                    adminDropdown.classList.add('hidden');
+                }
             });
 
             // Fermer le dropdown quand on clique ailleurs
             document.addEventListener('click', () => {
                 userMenuDropdown.classList.add('hidden');
+            });
+        }
+
+        // Menu admin dropdown
+        const adminMenuButton = document.getElementById('admin-menu-button');
+        const adminMenuDropdown = document.getElementById('admin-menu-dropdown');
+
+        if (adminMenuButton && adminMenuDropdown) {
+            adminMenuButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                adminMenuDropdown.classList.toggle('hidden');
+                // Fermer le menu utilisateur si ouvert
+                if (userMenuDropdown) {
+                    userMenuDropdown.classList.add('hidden');
+                }
+            });
+
+            // Fermer le dropdown quand on clique ailleurs
+            document.addEventListener('click', () => {
+                adminMenuDropdown.classList.add('hidden');
             });
         }
 
@@ -168,6 +224,8 @@ class Router {
         const mainNav = document.getElementById('main-nav');
         const userNameEl = document.getElementById('user-name');
         const userInitialsEl = document.getElementById('user-initials');
+        const adminMenuDesktop = document.getElementById('admin-menu-desktop');
+        const adminMenuMobile = document.getElementById('admin-menu-mobile');
 
         if (auth.isAuthenticated()) {
             // Afficher la navigation
@@ -179,6 +237,23 @@ class Router {
             }
             if (userInitialsEl) {
                 userInitialsEl.textContent = auth.getUserInitials();
+            }
+
+            // Afficher/masquer les menus admin selon le rôle
+            const isDecideur = auth.hasRole('décideur');
+            if (adminMenuDesktop) {
+                if (isDecideur) {
+                    adminMenuDesktop.classList.remove('hidden');
+                } else {
+                    adminMenuDesktop.classList.add('hidden');
+                }
+            }
+            if (adminMenuMobile) {
+                if (isDecideur) {
+                    adminMenuMobile.classList.remove('hidden');
+                } else {
+                    adminMenuMobile.classList.add('hidden');
+                }
             }
 
             // Mettre à jour les liens actifs

@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from bson import ObjectId
 
 from backend.models import (
-    CollecteCreate, CollecteResponse,
+    CollecteCreate, CollecteResponse, CollecteBatchCreate,
     MessageResponse
 )
 from backend.middleware.security import get_current_user
@@ -25,6 +25,8 @@ async def get_collectes(
     produit_id: Optional[str] = Query(None, description="Filtrer par produit"),
     agent_id: Optional[str] = Query(None, description="Filtrer par agent"),
     statut: Optional[str] = Query(None, description="Filtrer par statut"),
+    periode: Optional[str] = Query(None, description="Filtrer par période (matin1, matin2, soir1, soir2)"),
+    date: Optional[str] = Query(None, description="Date exacte (YYYY-MM-DD)"),
     date_debut: Optional[str] = Query(None, description="Date début (YYYY-MM-DD)"),
     date_fin: Optional[str] = Query(None, description="Date fin (YYYY-MM-DD)"),
     limit: int = Query(100, le=1000, description="Nombre max de résultats"),
@@ -51,9 +53,19 @@ async def get_collectes(
         query["produit_id"] = produit_id
     if statut:
         query["statut"] = statut
+    if periode:
+        query["periode"] = periode
 
-    # Filtre par période
-    if date_debut or date_fin:
+    # Filtre par date
+    if date:
+        # Date exacte
+        date_obj = datetime.fromisoformat(date)
+        query["date"] = {
+            "$gte": date_obj,
+            "$lt": date_obj + timedelta(days=1)
+        }
+    elif date_debut or date_fin:
+        # Plage de dates
         date_query = {}
         if date_debut:
             date_query["$gte"] = datetime.fromisoformat(date_debut)
@@ -61,22 +73,41 @@ async def get_collectes(
             date_query["$lte"] = datetime.fromisoformat(date_fin)
         query["date"] = date_query
 
-    collectes = await db.collectes_prix.find(query).sort("date", -1).limit(limit).to_list(None)
+    collectes = await db.collectes.find(query).sort("date", -1).limit(limit).to_list(None)
 
-    return [
-        CollecteResponse(
+    # Enrichir les données avec les noms
+    result = []
+    for collecte in collectes:
+        # Récupérer les données associées
+        marche = await db.marches.find_one({"_id": ObjectId(collecte["marche_id"])})
+        commune = await db.communes.find_one({"_id": ObjectId(marche["commune_id"])}) if marche and marche.get("commune_id") else None
+        produit = await db.produits.find_one({"_id": ObjectId(collecte["produit_id"])})
+        unite = await db.unites_mesure.find_one({"_id": ObjectId(collecte["unite_id"])}) if collecte.get("unite_id") else None
+        agent = await db.users.find_one({"_id": ObjectId(collecte["agent_id"])})
+
+        result.append(CollecteResponse(
             id=str(collecte["_id"]),
             marche_id=collecte["marche_id"],
             produit_id=collecte["produit_id"],
+            unite_id=collecte.get("unite_id", ""),
+            quantite=collecte.get("quantite", 1),
             prix=collecte["prix"],
             date=collecte["date"],
+            periode=collecte.get("periode"),
             commentaire=collecte.get("commentaire"),
             agent_id=collecte["agent_id"],
             statut=collecte["statut"],
-            created_at=collecte["created_at"]
-        )
-        for collecte in collectes
-    ]
+            latitude=collecte.get("latitude"),
+            longitude=collecte.get("longitude"),
+            created_at=collecte["created_at"],
+            marche_nom=marche.get("nom") if marche else None,
+            commune_nom=commune.get("nom") if commune else None,
+            produit_nom=produit.get("nom") if produit else None,
+            unite_nom=unite.get("unite") if unite else None,
+            agent_nom=f"{agent.get('prenom', '')} {agent.get('nom', '')}".strip() if agent else None
+        ))
+
+    return result
 
 
 @router.get("/{collecte_id}", response_model=CollecteResponse)
@@ -93,7 +124,7 @@ async def get_collecte(
             detail="ID de collecte invalide"
         )
 
-    collecte = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
+    collecte = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
     if not collecte:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -107,16 +138,33 @@ async def get_collecte(
             detail="Accès non autorisé à cette collecte"
         )
 
+    # Enrichir avec les noms
+    marche = await db.marches.find_one({"_id": ObjectId(collecte["marche_id"])})
+    commune = await db.communes.find_one({"_id": ObjectId(marche["commune_id"])}) if marche and marche.get("commune_id") else None
+    produit = await db.produits.find_one({"_id": ObjectId(collecte["produit_id"])})
+    unite = await db.unites_mesure.find_one({"_id": ObjectId(collecte["unite_id"])}) if collecte.get("unite_id") else None
+    agent = await db.users.find_one({"_id": ObjectId(collecte["agent_id"])})
+
     return CollecteResponse(
         id=str(collecte["_id"]),
         marche_id=collecte["marche_id"],
         produit_id=collecte["produit_id"],
+        unite_id=collecte.get("unite_id", ""),
+        quantite=collecte.get("quantite", 1),
         prix=collecte["prix"],
         date=collecte["date"],
+        periode=collecte.get("periode"),
         commentaire=collecte.get("commentaire"),
         agent_id=collecte["agent_id"],
         statut=collecte["statut"],
-        created_at=collecte["created_at"]
+        latitude=collecte.get("latitude"),
+        longitude=collecte.get("longitude"),
+        created_at=collecte["created_at"],
+        marche_nom=marche.get("nom") if marche else None,
+        commune_nom=commune.get("nom") if commune else None,
+        produit_nom=produit.get("nom") if produit else None,
+        unite_nom=unite.get("unite") if unite else None,
+        agent_nom=f"{agent.get('prenom', '')} {agent.get('nom', '')}".strip() if agent else None
     )
 
 
@@ -166,40 +214,166 @@ async def create_collecte(
             detail="Le produit spécifié n'existe pas"
         )
 
-    # Vérifier les doublons (même marché, produit, date)
-    existing = await db.collectes_prix.find_one({
-        "marche_id": collecte.marche_id,
-        "produit_id": collecte.produit_id,
-        "date": collecte.date,
-        "agent_id": current_user.id
-    })
-
-    if existing:
+    # Vérifier que l'unité de mesure existe
+    if not ObjectId.is_valid(collecte.unite_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Une collecte existe déjà pour ce marché/produit/date"
+            detail="ID d'unité de mesure invalide"
         )
 
-    collecte_dict = collecte.model_dump()
+    unite = await db.unites_mesure.find_one({"_id": ObjectId(collecte.unite_id)})
+    if not unite:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="L'unité de mesure spécifiée n'existe pas"
+        )
+
+    # Vérifier les doublons (même marché, produit, unite, date, periode)
+    duplicate_query = {
+        "marche_id": collecte.marche_id,
+        "produit_id": collecte.produit_id,
+        "unite_id": collecte.unite_id,
+        "date": collecte.date,
+        "agent_id": current_user.id
+    }
+
+    # Inclure la période si fournie
+    if collecte.periode:
+        duplicate_query["periode"] = collecte.periode
+
+    existing = await db.collectes.find_one(duplicate_query)
+
+    if existing:
+        detail_msg = "Une collecte existe déjà pour ce marché/produit/unité/date"
+        if collecte.periode:
+            detail_msg += f"/période ({collecte.periode})"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=detail_msg
+        )
+
+    collecte_dict = collecte.model_dump(exclude_none=False)
     collecte_dict["agent_id"] = current_user.id
     collecte_dict["statut"] = "soumise"
     collecte_dict["created_at"] = datetime.utcnow()
     collecte_dict["synced_at"] = datetime.utcnow()
 
-    result = await db.collectes_prix.insert_one(collecte_dict)
-    created_collecte = await db.collectes_prix.find_one({"_id": result.inserted_id})
+    result = await db.collectes.insert_one(collecte_dict)
+    created_collecte = await db.collectes.find_one({"_id": result.inserted_id})
 
     return CollecteResponse(
         id=str(created_collecte["_id"]),
         marche_id=created_collecte["marche_id"],
         produit_id=created_collecte["produit_id"],
+        unite_id=created_collecte["unite_id"],
+        quantite=created_collecte.get("quantite", 1),
         prix=created_collecte["prix"],
         date=created_collecte["date"],
+        periode=created_collecte.get("periode"),
         commentaire=created_collecte.get("commentaire"),
         agent_id=created_collecte["agent_id"],
         statut=created_collecte["statut"],
-        created_at=created_collecte["created_at"]
+        latitude=created_collecte.get("latitude"),
+        longitude=created_collecte.get("longitude"),
+        created_at=created_collecte["created_at"],
+        unite_nom=unite.get("unite"),
+        marche_nom=marche.get("nom"),
+        produit_nom=produit.get("nom")
     )
+
+
+@router.post("/batch", response_model=dict, status_code=status.HTTP_201_CREATED)
+async def create_collectes_batch(
+    batch: CollecteBatchCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Créer plusieurs collectes de prix en une seule requête.
+
+    Utile pour le système 4 périodes où l'agent entre plusieurs prix à la fois.
+    Accessible aux agents uniquement.
+    """
+    # Vérifier que l'utilisateur est un agent
+    if not can_submit_collectes(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seuls les agents peuvent soumettre des collectes"
+        )
+
+    if not batch.collectes or len(batch.collectes) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La liste de collectes ne peut pas être vide"
+        )
+
+    created_count = 0
+    skipped_count = 0
+    errors = []
+
+    for idx, collecte in enumerate(batch.collectes):
+        try:
+            # Vérifier ObjectIds
+            if not ObjectId.is_valid(collecte.marche_id):
+                errors.append(f"Collecte {idx+1}: ID de marché invalide")
+                continue
+            if not ObjectId.is_valid(collecte.produit_id):
+                errors.append(f"Collecte {idx+1}: ID de produit invalide")
+                continue
+            if not ObjectId.is_valid(collecte.unite_id):
+                errors.append(f"Collecte {idx+1}: ID d'unité invalide")
+                continue
+
+            # Vérifier que les entités existent
+            marche = await db.marches.find_one({"_id": ObjectId(collecte.marche_id)})
+            if not marche:
+                errors.append(f"Collecte {idx+1}: Marché non trouvé")
+                continue
+
+            produit = await db.produits.find_one({"_id": ObjectId(collecte.produit_id)})
+            if not produit:
+                errors.append(f"Collecte {idx+1}: Produit non trouvé")
+                continue
+
+            unite = await db.unites_mesure.find_one({"_id": ObjectId(collecte.unite_id)})
+            if not unite:
+                errors.append(f"Collecte {idx+1}: Unité non trouvée")
+                continue
+
+            # Vérifier les doublons
+            duplicate_query = {
+                "marche_id": collecte.marche_id,
+                "produit_id": collecte.produit_id,
+                "unite_id": collecte.unite_id,
+                "date": collecte.date,
+                "agent_id": current_user.id
+            }
+            if collecte.periode:
+                duplicate_query["periode"] = collecte.periode
+
+            existing = await db.collectes.find_one(duplicate_query)
+            if existing:
+                skipped_count += 1
+                continue
+
+            # Créer la collecte
+            collecte_dict = collecte.model_dump(exclude_none=False)
+            collecte_dict["agent_id"] = current_user.id
+            collecte_dict["statut"] = "soumise"
+            collecte_dict["created_at"] = datetime.utcnow()
+            collecte_dict["synced_at"] = datetime.utcnow()
+
+            await db.collectes.insert_one(collecte_dict)
+            created_count += 1
+
+        except Exception as e:
+            errors.append(f"Collecte {idx+1}: {str(e)}")
+
+    return {
+        "message": f"{created_count} collecte(s) créée(s) avec succès",
+        "created": created_count,
+        "skipped": skipped_count,
+        "errors": errors
+    }
 
 
 @router.put("/{collecte_id}", response_model=CollecteResponse)
@@ -220,7 +394,7 @@ async def update_collecte(
             detail="ID de collecte invalide"
         )
 
-    existing = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
+    existing = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
     if not existing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -238,26 +412,43 @@ async def update_collecte(
             detail="Impossible de modifier cette collecte"
         )
 
-    collecte_dict = collecte.model_dump()
+    collecte_dict = collecte.model_dump(exclude_none=False)
     collecte_dict["updated_at"] = datetime.utcnow()
 
-    await db.collectes_prix.update_one(
+    await db.collectes.update_one(
         {"_id": ObjectId(collecte_id)},
         {"$set": collecte_dict}
     )
 
-    updated_collecte = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
+    updated_collecte = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
+
+    # Enrichir avec les noms
+    marche = await db.marches.find_one({"_id": ObjectId(updated_collecte["marche_id"])})
+    commune = await db.communes.find_one({"_id": ObjectId(marche["commune_id"])}) if marche and marche.get("commune_id") else None
+    produit = await db.produits.find_one({"_id": ObjectId(updated_collecte["produit_id"])})
+    unite = await db.unites_mesure.find_one({"_id": ObjectId(updated_collecte["unite_id"])}) if updated_collecte.get("unite_id") else None
+    agent = await db.users.find_one({"_id": ObjectId(updated_collecte["agent_id"])})
 
     return CollecteResponse(
         id=str(updated_collecte["_id"]),
         marche_id=updated_collecte["marche_id"],
         produit_id=updated_collecte["produit_id"],
+        unite_id=updated_collecte.get("unite_id", ""),
+        quantite=updated_collecte.get("quantite", 1),
         prix=updated_collecte["prix"],
         date=updated_collecte["date"],
+        periode=updated_collecte.get("periode"),
         commentaire=updated_collecte.get("commentaire"),
         agent_id=updated_collecte["agent_id"],
         statut=updated_collecte["statut"],
-        created_at=updated_collecte["created_at"]
+        latitude=updated_collecte.get("latitude"),
+        longitude=updated_collecte.get("longitude"),
+        created_at=updated_collecte["created_at"],
+        marche_nom=marche.get("nom") if marche else None,
+        commune_nom=commune.get("nom") if commune else None,
+        produit_nom=produit.get("nom") if produit else None,
+        unite_nom=unite.get("unite") if unite else None,
+        agent_nom=f"{agent.get('prenom', '')} {agent.get('nom', '')}".strip() if agent else None
     )
 
 
@@ -278,7 +469,7 @@ async def delete_collecte(
             detail="ID de collecte invalide"
         )
 
-    existing = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
+    existing = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
     if not existing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -296,7 +487,7 @@ async def delete_collecte(
             detail="Impossible de supprimer cette collecte"
         )
 
-    await db.collectes_prix.delete_one({"_id": ObjectId(collecte_id)})
+    await db.collectes.delete_one({"_id": ObjectId(collecte_id)})
 
     return MessageResponse(message="Collecte supprimée avec succès")
 
@@ -318,7 +509,7 @@ async def valider_collecte(
             detail="ID de collecte invalide"
         )
 
-    collecte = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
+    collecte = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
     if not collecte:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -331,7 +522,7 @@ async def valider_collecte(
             detail="Cette collecte est déjà validée"
         )
 
-    await db.collectes_prix.update_one(
+    await db.collectes.update_one(
         {"_id": ObjectId(collecte_id)},
         {
             "$set": {
@@ -343,7 +534,7 @@ async def valider_collecte(
         }
     )
 
-    updated_collecte = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
+    updated_collecte = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
 
     # Générer des alertes automatiquement
     try:
@@ -354,16 +545,33 @@ async def valider_collecte(
         import logging
         logging.error(f"Erreur lors de la génération d'alertes: {e}")
 
+    # Enrichir avec les noms
+    marche = await db.marches.find_one({"_id": ObjectId(updated_collecte["marche_id"])})
+    commune = await db.communes.find_one({"_id": ObjectId(marche["commune_id"])}) if marche and marche.get("commune_id") else None
+    produit = await db.produits.find_one({"_id": ObjectId(updated_collecte["produit_id"])})
+    unite = await db.unites_mesure.find_one({"_id": ObjectId(updated_collecte["unite_id"])}) if updated_collecte.get("unite_id") else None
+    agent = await db.users.find_one({"_id": ObjectId(updated_collecte["agent_id"])})
+
     return CollecteResponse(
         id=str(updated_collecte["_id"]),
         marche_id=updated_collecte["marche_id"],
         produit_id=updated_collecte["produit_id"],
+        unite_id=updated_collecte.get("unite_id", ""),
+        quantite=updated_collecte.get("quantite", 1),
         prix=updated_collecte["prix"],
         date=updated_collecte["date"],
+        periode=updated_collecte.get("periode"),
         commentaire=updated_collecte.get("commentaire"),
         agent_id=updated_collecte["agent_id"],
         statut=updated_collecte["statut"],
-        created_at=updated_collecte["created_at"]
+        latitude=updated_collecte.get("latitude"),
+        longitude=updated_collecte.get("longitude"),
+        created_at=updated_collecte["created_at"],
+        marche_nom=marche.get("nom") if marche else None,
+        commune_nom=commune.get("nom") if commune else None,
+        produit_nom=produit.get("nom") if produit else None,
+        unite_nom=unite.get("unite") if unite else None,
+        agent_nom=f"{agent.get('prenom', '')} {agent.get('nom', '')}".strip() if agent else None
     )
 
 
@@ -383,14 +591,14 @@ async def rejeter_collecte(
             detail="ID de collecte invalide"
         )
 
-    collecte = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
+    collecte = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
     if not collecte:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Collecte non trouvée"
         )
 
-    await db.collectes_prix.update_one(
+    await db.collectes.update_one(
         {"_id": ObjectId(collecte_id)},
         {
             "$set": {
@@ -403,18 +611,35 @@ async def rejeter_collecte(
         }
     )
 
-    updated_collecte = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
+    updated_collecte = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
+
+    # Enrichir avec les noms
+    marche = await db.marches.find_one({"_id": ObjectId(updated_collecte["marche_id"])})
+    commune = await db.communes.find_one({"_id": ObjectId(marche["commune_id"])}) if marche and marche.get("commune_id") else None
+    produit = await db.produits.find_one({"_id": ObjectId(updated_collecte["produit_id"])})
+    unite = await db.unites_mesure.find_one({"_id": ObjectId(updated_collecte["unite_id"])}) if updated_collecte.get("unite_id") else None
+    agent = await db.users.find_one({"_id": ObjectId(updated_collecte["agent_id"])})
 
     return CollecteResponse(
         id=str(updated_collecte["_id"]),
         marche_id=updated_collecte["marche_id"],
         produit_id=updated_collecte["produit_id"],
+        unite_id=updated_collecte.get("unite_id", ""),
+        quantite=updated_collecte.get("quantite", 1),
         prix=updated_collecte["prix"],
         date=updated_collecte["date"],
+        periode=updated_collecte.get("periode"),
         commentaire=updated_collecte.get("commentaire"),
         agent_id=updated_collecte["agent_id"],
         statut=updated_collecte["statut"],
-        created_at=updated_collecte["created_at"]
+        latitude=updated_collecte.get("latitude"),
+        longitude=updated_collecte.get("longitude"),
+        created_at=updated_collecte["created_at"],
+        marche_nom=marche.get("nom") if marche else None,
+        commune_nom=commune.get("nom") if commune else None,
+        produit_nom=produit.get("nom") if produit else None,
+        unite_nom=unite.get("unite") if unite else None,
+        agent_nom=f"{agent.get('prenom', '')} {agent.get('nom', '')}".strip() if agent else None
     )
 
 
@@ -449,14 +674,14 @@ async def get_statistiques_collectes(
         query["date"] = date_query
 
     # Compter total
-    total = await db.collectes_prix.count_documents(query)
+    total = await db.collectes.count_documents(query)
 
     # Répartition par statut
     pipeline_statut = [
         {"$match": query},
         {"$group": {"_id": "$statut", "count": {"$sum": 1}}}
     ]
-    statuts = await db.collectes_prix.aggregate(pipeline_statut).to_list(None)
+    statuts = await db.collectes.aggregate(pipeline_statut).to_list(None)
 
     stats = {
         "total_collectes": total,
@@ -473,7 +698,7 @@ async def get_statistiques_collectes(
             {"$match": query},
             {"$group": {"_id": "$agent_id", "count": {"$sum": 1}}}
         ]
-        agents = await db.collectes_prix.aggregate(pipeline_agent).to_list(None)
+        agents = await db.collectes.aggregate(pipeline_agent).to_list(None)
         stats["par_agent"] = {a["_id"]: a["count"] for a in agents}
 
     return stats

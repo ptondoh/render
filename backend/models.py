@@ -325,6 +325,7 @@ class MarcheResponse(MarcheBase):
     actif: bool
     commune_nom: Optional[str] = None
     departement_nom: Optional[str] = None
+    produits: Optional[list[dict]] = Field(None, description="Liste des produits du marché")
 
     class Config:
         populate_by_name = True
@@ -447,12 +448,19 @@ class CollecteBase(BaseModel):
     quantite: float = Field(..., gt=0, description="Quantité (> 0)")
     prix: float = Field(..., ge=0, description="Prix collecté (>= 0)")
     date: datetime = Field(..., description="Date de la collecte")
+    periode: Optional[Literal["matin1", "matin2", "soir1", "soir2"]] = Field(None, description="Période de collecte (4 périodes par jour)")
     commentaire: Optional[str] = Field(None, description="Commentaire optionnel")
 
 
 class CollecteCreate(CollecteBase):
     """Modèle pour la création d'une collecte"""
-    pass
+    latitude: Optional[float] = Field(None, description="Latitude GPS")
+    longitude: Optional[float] = Field(None, description="Longitude GPS")
+
+
+class CollecteBatchCreate(BaseModel):
+    """Modèle pour la création en lot de collectes"""
+    collectes: list[CollecteCreate] = Field(..., description="Liste de collectes à créer")
 
 
 class CollecteInDB(CollecteBase):
@@ -480,10 +488,15 @@ class CollecteResponse(CollecteBase):
     id: str
     agent_id: str
     statut: str
+    periode: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     created_at: datetime
     unite_nom: Optional[str] = None
     marche_nom: Optional[str] = None
+    commune_nom: Optional[str] = None
     produit_nom: Optional[str] = None
+    agent_nom: Optional[str] = None
 
     class Config:
         populate_by_name = True

@@ -79,12 +79,13 @@ async def create_indexes() -> None:
         await db.users.create_index("email", unique=True)
         await db.users.create_index("role")
 
-        # Index pour la collection collectes_prix
-        await db.collectes_prix.create_index("marche_id")
-        await db.collectes_prix.create_index("produit_id")
-        await db.collectes_prix.create_index("date")
-        await db.collectes_prix.create_index("agent_id")
-        await db.collectes_prix.create_index("statut")
+        # Index pour la collection collectes
+        await db.collectes.create_index("marche_id")
+        await db.collectes.create_index("produit_id")
+        await db.collectes.create_index("date")
+        await db.collectes.create_index("agent_id")
+        await db.collectes.create_index("statut")
+        await db.collectes.create_index("periode")
 
         # Index pour la collection audit_logs
         await db.audit_logs.create_index("user_id")
