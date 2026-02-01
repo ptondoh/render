@@ -837,7 +837,7 @@ npm install
 - ✅ **Section 3** - Sécurité et Authentification
 - ✅ **Section 4** - Gestion des Données de Référence
 - ✅ **Section 5** - Collectes de Prix et Alertes
-- ⚙️ **Section 6** - Frontend Architecture de Base (en cours)
+- ⚙️ **Section 6** - Frontend Architecture de Base (80% complété - pages collectes terminée)
 
 ### Section 5 - Collectes de Prix et Alertes ✅
 
@@ -975,6 +975,23 @@ npm install
     - Pagination configurable
     - Tests: 5/5 (100%)
 
+15. ✅ `frontend/pages/collectes.js` - Gestion Collectes de Prix (1547 lignes)
+    - **Système 4 périodes** : matin1, matin2, soir1, soir2
+    - **GPS automatique** : détection position utilisateur en temps réel
+    - **Carte interactive Leaflet** : affichage carte (400px), marqueurs utilisateur et marché
+    - **Upload photos** : une photo par produit et par période (base64)
+    - **Pré-remplissage intelligent** : récupération automatique des prix des périodes précédentes
+    - **Sélection marché** : dropdown avec tous les marchés disponibles
+    - **Liste produits** : affichage tous les produits avec unités de mesure
+    - **Ajout produit dynamique** : ajout de produits manquants directement depuis le formulaire
+    - **Pagination** : contrôle nombre de produits affichés (10, 20, 50 items)
+    - **Enregistrement individuel** : chaque période enregistrée séparément (4 requêtes POST)
+    - **Design responsive** : grille 2 colonnes (carte + contrôles) adaptée mobile
+    - **Validation** : vérification champs obligatoires avant soumission
+    - **Gestion erreurs** : affichage toast pour succès/erreurs
+    - **Optimisations UX** : icônes, badges, inputs réduits, états de chargement
+    - Route: `/collectes` enregistrée dans `app.js`
+
 **Scripts de migration backend:**
 - ✅ `backend/migrate_ids_to_objectid.py` - Migration _id string → ObjectId (34 documents migrés)
 - ✅ `backend/migrate_unites_structure.py` - Migration structure unités (10 unités migrées)
@@ -998,7 +1015,6 @@ npm install
 - ✅ Backend: routes PUT/DELETE fonctionnelles (404 corrigé)
 
 #### À compléter pour Section 6
-- ❌ `frontend/pages/collectes.js` - Page gestion collectes de prix
 - ❌ `frontend/pages/alertes.js` - Page consultation et résolution alertes
 - ❌ `frontend/pages/profil.js` - Page profil utilisateur
 - ❌ Mode hors-ligne avancé (IndexedDB + synchronisation)
