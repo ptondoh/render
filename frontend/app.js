@@ -93,6 +93,22 @@ const routes = {
             return AdminProduitsPage();
         }
     },
+    '/admin/departements': {
+        title: 'Gestion Départements - SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: AdminDepartementsPage } = await import('./pages/admin-departements.js');
+            return AdminDepartementsPage();
+        }
+    },
+    '/admin/communes': {
+        title: 'Gestion Communes - SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: AdminCommunesPage } = await import('./pages/admin-communes.js');
+            return AdminCommunesPage();
+        }
+    },
     '/admin/marches': {
         title: 'Gestion Marchés - SAP',
         requireAuth: true,
