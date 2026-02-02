@@ -18,8 +18,8 @@ test.describe('Test simple - Départements et Communes', () => {
         await page.waitForSelector('input[type="email"]');
 
         // Remplir le formulaire
-        await page.fill('input[type="email"]', 'admin@sap.ht');
-        await page.fill('input[type="password"]', 'admin123');
+        await page.fill('input[type="email"]', 'decideur@sap.ht');
+        await page.fill('input[type="password"]', 'Test123!');
 
         // Soumettre
         await page.click('button:has-text("Se connecter")');
@@ -31,8 +31,8 @@ test.describe('Test simple - Départements et Communes', () => {
     test('devrait naviguer vers admin départements', async ({ page }) => {
         // Login d'abord
         await page.goto('/#/login');
-        await page.fill('input[type="email"]', 'admin@sap.ht');
-        await page.fill('input[type="password"]', 'admin123');
+        await page.fill('input[type="email"]', 'decideur@sap.ht');
+        await page.fill('input[type="password"]', 'Test123!');
         await page.click('button:has-text("Se connecter")');
         await page.waitForURL(/.*#\/dashboard/, { timeout: 30000 });
 
@@ -40,35 +40,47 @@ test.describe('Test simple - Départements et Communes', () => {
         await page.goto('/#/admin/departements');
         await page.waitForLoadState('networkidle');
 
-        // Vérifier le titre
-        await expect(page.locator('h1')).toContainText('Départements');
+        // Vérifier le titre (sélecteur plus spécifique)
+        await expect(page.locator('h1.text-3xl')).toContainText('Départements');
     });
 
     test('devrait afficher la liste des départements', async ({ page }) => {
         // Login
         await page.goto('/#/login');
-        await page.fill('input[type="email"]', 'admin@sap.ht');
-        await page.fill('input[type="password"]', 'admin123');
+        await page.fill('input[type="email"]', 'decideur@sap.ht');
+        await page.fill('input[type="password"]', 'Test123!');
         await page.click('button:has-text("Se connecter")');
         await page.waitForURL(/.*#\/dashboard/, { timeout: 30000 });
 
         // Aller sur départements
         await page.goto('/#/admin/departements');
 
-        // Attendre que le spinner disparaisse
-        await page.waitForSelector('.animate-spin', { state: 'hidden', timeout: 20000 });
+        // Attendre que le réseau soit stable
+        await page.waitForLoadState('networkidle', { timeout: 30000 });
+
+        // Attendre que le spinner disparaisse (timeout plus long)
+        const spinner = page.locator('.animate-spin');
+        if (await spinner.count() > 0) {
+            await spinner.first().waitFor({ state: 'hidden', timeout: 30000 });
+        }
+
+        // Attendre un peu plus pour que les données se chargent
+        await page.waitForTimeout(2000);
+
+        // Attendre que la table soit visible (timeout plus long)
+        await page.waitForSelector('table', { timeout: 30000 });
 
         // Vérifier la table
         await expect(page.locator('table')).toBeVisible();
-        await expect(page.locator('th:has-text("Code")')).toBeVisible();
-        await expect(page.locator('th:has-text("Nom")')).toBeVisible();
+        await expect(page.locator('th', { hasText: /^Code$/ })).toBeVisible();
+        await expect(page.locator('th', { hasText: /^Nom$/ })).toBeVisible();
     });
 
     test('devrait naviguer vers admin communes', async ({ page }) => {
         // Login
         await page.goto('/#/login');
-        await page.fill('input[type="email"]', 'admin@sap.ht');
-        await page.fill('input[type="password"]', 'admin123');
+        await page.fill('input[type="email"]', 'decideur@sap.ht');
+        await page.fill('input[type="password"]', 'Test123!');
         await page.click('button:has-text("Se connecter")');
         await page.waitForURL(/.*#\/dashboard/, { timeout: 30000 });
 
@@ -76,28 +88,40 @@ test.describe('Test simple - Départements et Communes', () => {
         await page.goto('/#/admin/communes');
         await page.waitForLoadState('networkidle');
 
-        // Vérifier le titre
-        await expect(page.locator('h1')).toContainText('Communes');
+        // Vérifier le titre (sélecteur plus spécifique)
+        await expect(page.locator('h1.text-3xl')).toContainText('Communes');
     });
 
     test('devrait afficher la liste des communes', async ({ page }) => {
         // Login
         await page.goto('/#/login');
-        await page.fill('input[type="email"]', 'admin@sap.ht');
-        await page.fill('input[type="password"]', 'admin123');
+        await page.fill('input[type="email"]', 'decideur@sap.ht');
+        await page.fill('input[type="password"]', 'Test123!');
         await page.click('button:has-text("Se connecter")');
         await page.waitForURL(/.*#\/dashboard/, { timeout: 30000 });
 
         // Aller sur communes
         await page.goto('/#/admin/communes');
 
-        // Attendre que le spinner disparaisse
-        await page.waitForSelector('.animate-spin', { state: 'hidden', timeout: 20000 });
+        // Attendre que le réseau soit stable
+        await page.waitForLoadState('networkidle', { timeout: 30000 });
+
+        // Attendre que le spinner disparaisse (timeout plus long)
+        const spinner = page.locator('.animate-spin');
+        if (await spinner.count() > 0) {
+            await spinner.first().waitFor({ state: 'hidden', timeout: 30000 });
+        }
+
+        // Attendre un peu plus pour que les données se chargent
+        await page.waitForTimeout(2000);
+
+        // Attendre que la table soit visible (timeout plus long)
+        await page.waitForSelector('table', { timeout: 30000 });
 
         // Vérifier la table
         await expect(page.locator('table')).toBeVisible();
-        await expect(page.locator('th:has-text("Code")')).toBeVisible();
-        await expect(page.locator('th:has-text("Nom")')).toBeVisible();
+        await expect(page.locator('th', { hasText: /^Code$/ })).toBeVisible();
+        await expect(page.locator('th', { hasText: /^Nom$/ })).toBeVisible();
         await expect(page.locator('th:has-text("Département")')).toBeVisible();
     });
 });

@@ -13,8 +13,8 @@ export async function loginAsDecideur(page) {
     await page.waitForSelector('input[type="email"]', { timeout: 10000 });
 
     // Remplir le formulaire de connexion
-    await page.fill('input[type="email"]', 'admin@sap.ht');
-    await page.fill('input[type="password"]', 'admin123');
+    await page.fill('input[type="email"]', 'decideur@sap.ht');
+    await page.fill('input[type="password"]', 'Test123!');
 
     // Cliquer sur le bouton de connexion
     await page.click('button:has-text("Se connecter"), button[type="submit"]');

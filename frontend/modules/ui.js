@@ -287,7 +287,7 @@ function getToastIcon(type) {
 /**
  * Composant Spinner (chargement)
  */
-export function Spinner({ size = 'md', className = '' }) {
+export function Spinner({ size = 'md', className = '' } = {}) {
     const sizeClasses = {
         sm: 'h-4 w-4',
         md: 'h-8 w-8',

@@ -4,7 +4,7 @@
  */
 
 const API_BASE_URL = window.location.hostname === 'localhost'
-    ? 'http://localhost:3003'
+    ? 'http://localhost:8000'
     : window.location.origin;
 
 /**
