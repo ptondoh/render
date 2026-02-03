@@ -388,3 +388,96 @@ async def get_marches_by_commune(
         )
 
     return await get_marches(commune_id=commune_id, current_user=current_user)
+
+
+@router.post("/{marche_id}/produits", response_model=MessageResponse)
+async def add_produit_to_marche(
+    marche_id: str,
+    produit_id: str = Query(..., description="ID du produit à ajouter"),
+    unite_id: str = Query(..., description="ID de l'unité de mesure"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Ajoute un produit à la liste des produits disponibles d'un marché.
+    Accessible aux agents et décideurs.
+
+    Permet aux agents d'ajouter des produits lors de collectes sur des marchés
+    qui n'ont pas encore de produits configurés.
+    """
+    # Vérifier les IDs
+    if not ObjectId.is_valid(marche_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID de marché invalide"
+        )
+
+    if not ObjectId.is_valid(produit_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID de produit invalide"
+        )
+
+    if not ObjectId.is_valid(unite_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID d'unité invalide"
+        )
+
+    # Vérifier que le marché existe
+    marche = await db.marches.find_one({"_id": ObjectId(marche_id)})
+    if not marche:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Marché non trouvé"
+        )
+
+    # Vérifier que le produit existe
+    produit = await db.produits.find_one({"_id": ObjectId(produit_id)})
+    if not produit:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Produit non trouvé"
+        )
+
+    # Vérifier que l'unité existe
+    unite = await db.unites_mesure.find_one({"_id": ObjectId(unite_id)})
+    if not unite:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unité de mesure non trouvée"
+        )
+
+    # Vérifier si le produit est déjà dans le marché
+    produits_list = marche.get("produits", [])
+    produit_exists = any(p.get("id_produit") == produit_id for p in produits_list)
+
+    if not produit_exists:
+        # Ajouter le produit
+        nouveau_produit = {
+            "id_produit": produit_id,
+            "id_unite_mesure": unite_id,
+            "actif": True,
+            "ajout_par": current_user.id,  # Tracer qui a ajouté le produit
+            "ajout_le": datetime.utcnow()
+        }
+
+        produits_list.append(nouveau_produit)
+
+        # Mettre à jour le marché
+        await db.marches.update_one(
+            {"_id": ObjectId(marche_id)},
+            {
+                "$set": {
+                    "produits": produits_list,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+
+        return MessageResponse(
+            message=f"Produit '{produit['nom']}' ajouté au marché '{marche['nom']}' avec succès"
+        )
+    else:
+        return MessageResponse(
+            message=f"Produit '{produit['nom']}' déjà présent dans le marché"
+        )

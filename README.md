@@ -1098,6 +1098,284 @@ Teste: CREATE, UPDATE, DELETE sur toutes les pages
   - ❌ Optimisation performance
   - ❌ Documentation déploiement
 
+## 🧪 Tester en Local
+
+Cette section vous guide pour configurer et tester complètement le projet sur votre machine locale.
+
+### Prérequis Vérifiés
+
+Avant de commencer, assurez-vous d'avoir :
+- ✅ **Python 3.13+** installé
+- ✅ **Node.js 16+** et npm installés
+- ✅ **MongoDB** installé et en cours d'exécution
+- ✅ Clé **SENDGRID_API_KEY** dans `.env` (optionnel pour emails)
+
+### Étape 1 : Cloner et Installer
+
+```bash
+# Cloner le dépôt
+git clone https://github.com/tep-parsa/sap-minimaliste.git
+cd sap-minimaliste
+
+# Copier les variables d'environnement
+cp .env.example .env
+
+# Créer et activer l'environnement virtuel Python
+python -m venv venv
+
+# Windows:
+venv\Scripts\activate
+# Linux/Mac:
+source venv/bin/activate
+
+# Installer les dépendances Python
+pip install -r requirements.txt
+
+# Installer les dépendances Node.js
+npm install
+```
+
+### Étape 2 : Initialiser la Base de Données
+
+```bash
+# S'assurer que MongoDB est démarré
+# Windows (service):
+net start MongoDB
+
+# Ou manuellement:
+mongod --dbpath C:\data\db
+
+# Dans un nouveau terminal, charger les données de référence
+python backend/scripts/seed_data.py
+```
+
+**Résultat attendu** :
+```
+Chargement des donnees de reference...
+  Unites de mesure: 14 documents
+  Categories: 9 documents
+  Departements: 10 documents
+  Communes: 28 documents
+  Produits: 15 documents
+  Marches: 2 documents
+  Utilisateurs: 3 documents
+```
+
+### Étape 3 : Compiler le CSS Tailwind
+
+```bash
+# Compiler le CSS (production)
+npm run tailwind:build
+
+# Ou en mode watch (développement)
+npm run tailwind:watch
+```
+
+**Fichier généré** : `frontend/dist/output.css` (~27 KB)
+
+### Étape 4 : Démarrer les Serveurs
+
+**Terminal 1 - Backend** :
+```bash
+# Activer l'environnement virtuel
+venv\Scripts\activate
+
+# Démarrer FastAPI avec hot-reload
+uvicorn backend.main:app --reload --port 8000
+```
+
+**Résultat** :
+```
+INFO:     Uvicorn running on http://127.0.0.1:8000
+INFO:     Application startup complete.
+```
+
+**Terminal 2 - Frontend** :
+```bash
+# Démarrer le serveur de développement
+npm run serve
+
+# Ou tout en un (Tailwind watch + serveur)
+npm run dev
+```
+
+**Résultat** :
+```
+Serving HTTP on 0.0.0.0 port 3000 (http://0.0.0.0:3000/)
+```
+
+### Étape 5 : Accéder à l'Application
+
+Ouvrez votre navigateur et accédez à :
+- **Frontend** : http://localhost:3000
+- **Backend API** : http://localhost:8000
+- **Documentation API** : http://localhost:8000/docs
+- **Health Check** : http://localhost:8000/health
+
+### Étape 6 : Se Connecter
+
+Utilisez un des comptes de test créés par le seed :
+
+**Agent** :
+- Email : `agent@sap.ht`
+- Mot de passe : `Test123!`
+- Rôle : Agent de terrain (collecte de prix)
+
+**Décideur** :
+- Email : `decideur@sap.ht`
+- Mot de passe : `Test123!`
+- Rôle : Décideur (validation, alertes)
+
+**Admin** :
+- Email : `admin@sap.ht`
+- Mot de passe : `admin123`
+- Rôle : Décideur avec droits admin
+
+### Étape 7 : Tester les Fonctionnalités
+
+#### 7.1 Dashboard
+- ✅ Vérifier les statistiques affichées selon le rôle
+- ✅ Cliquer sur les tuiles cliquables (Alertes, Collectes, etc.)
+
+#### 7.2 Collectes (Agent)
+- ✅ Sélectionner un marché
+- ✅ Voir la carte GPS avec position
+- ✅ Entrer des prix pour différentes périodes (Matin 1, Matin 2, Soir 1, Soir 2)
+- ✅ Ajouter un produit hors liste si le marché n'a pas de produits
+- ✅ Soumettre la collecte
+
+#### 7.3 Import CSV/Excel (Agent)
+- ✅ Télécharger un template (Excel ou CSV)
+- ✅ Remplir avec des données
+- ✅ Uploader le fichier
+- ✅ Vérifier l'aperçu des données
+- ✅ Confirmer l'import
+
+#### 7.4 Alertes (Décideur)
+- ✅ Voir la liste des alertes
+- ✅ Filtrer par niveau (Normal, Surveillance, Alerte, Urgence)
+- ✅ Filtrer par département, produit, marché
+- ✅ Consulter les détails d'une alerte
+
+#### 7.5 Consultation Collectes (Décideur)
+- ✅ Voir le tableau paginé de toutes les collectes
+- ✅ Filtrer par agent, marché, produit, période, dates
+- ✅ Changer le nombre d'items par page
+
+#### 7.6 Pages Admin (Décideur)
+- ✅ Unités de mesure : CRUD complet
+- ✅ Catégories : CRUD complet
+- ✅ Produits : CRUD complet avec catégories
+- ✅ Marchés : CRUD complet avec communes et produits
+
+### Étape 8 : Tester avec Playwright (Optionnel)
+
+```bash
+# Installer Playwright (si pas déjà fait)
+npx playwright install
+
+# Lancer les tests E2E
+npm test
+
+# Ou en mode UI interactif
+npm run test:ui
+```
+
+**Tests disponibles** :
+- ✅ Authentification (login, MFA)
+- ✅ Dashboard avec statistiques
+- ✅ CRUD sur 4 pages admin
+- ✅ Pagination, recherche, filtres
+- ✅ Import CSV/Excel avec aperçu
+
+### Étape 9 : Tester l'Import CSV/Excel
+
+#### Templates disponibles
+Les templates sont dans le dossier `templates/` :
+- `template_collecte_prix.csv` - Format CSV
+- `template_collecte_prix.xlsx` - Format Excel avec 3 feuilles
+
+#### Structure du template
+| Colonne | Description | Obligatoire | Exemple |
+|---------|-------------|-------------|---------|
+| marche_nom | Nom du marché | OUI | Croix-des-Bossales |
+| produit_nom | Nom du produit | OUI | Riz local |
+| unite_nom | Unité de mesure | OUI | kilogramme |
+| quantite | Quantité mesurée | OUI | 1.0 |
+| prix | Prix en gourdes | OUI | 75.0 |
+| date | Date (YYYY-MM-DD) | OUI | 2026-02-03 |
+| periode | Période | OUI | matin1 |
+| commentaire | Commentaire | NON | Prix stable |
+
+#### Périodes valides
+- `matin1` - Matin 1 (6h-9h)
+- `matin2` - Matin 2 (9h-12h)
+- `soir1` - Soir 1 (12h-15h)
+- `soir2` - Soir 2 (15h-18h)
+
+#### Test d'import
+1. Se connecter comme agent (`agent@sap.ht`)
+2. Aller sur la page Collectes
+3. Cliquer sur "Template Excel" ou "Template CSV"
+4. Modifier le template avec vos données
+5. Glisser-déposer ou sélectionner le fichier
+6. Vérifier l'aperçu des données
+7. Cliquer sur "Confirmer l'import"
+8. Vérifier le message de succès ou les erreurs de validation
+
+### Dépannage
+
+#### MongoDB ne démarre pas
+```bash
+# Vérifier le service
+net start MongoDB
+
+# Ou créer le dossier de données
+mkdir C:\data\db
+mongod --dbpath C:\data\db
+```
+
+#### CSS non chargé (404)
+```bash
+# Compiler le CSS Tailwind
+npm run tailwind:build
+
+# Vérifier que le fichier existe
+ls frontend/dist/output.css
+```
+
+#### Backend erreur "ModuleNotFoundError"
+```bash
+# Réinstaller les dépendances
+pip install -r requirements.txt
+
+# Vérifier que l'environnement virtuel est activé
+which python  # Linux/Mac
+where python  # Windows
+```
+
+#### Frontend en mode hors-ligne
+```bash
+# Hard refresh pour recharger le Service Worker
+Ctrl + F5  # Windows
+Cmd + Shift + R  # Mac
+```
+
+#### Import CSV/Excel échoue
+- Vérifier que pandas et openpyxl sont installés
+- Vérifier que les noms de marchés/produits existent dans la base
+- Consulter les erreurs de validation détaillées
+
+### Copier la Base de Données vers Atlas (Production)
+
+```bash
+# Script pour copier la base locale vers MongoDB Atlas
+python copy_db_to_atlas.py
+
+# Répondre "oui" pour confirmer
+# La base locale (sap_db) sera copiée vers test_sap_db sur Atlas
+```
+
 ## 🤝 Contribution
 
 Ce projet suit le workflow OpenSpec pour la gestion des changements. Voir `openspec/AGENTS.md` pour plus de détails.
@@ -1108,19 +1386,20 @@ MIT
 
 ---
 
-**Status**: ✅ Sections 1-6 terminées (Backend + 4 Pages Admin CRUD)
-**Version**: v0.6
-**Dernière mise à jour**: 2026-01-25
+**Status**: ✅ Sections 1-6 terminées (Backend + Frontend complet)
+**Version**: v0.7
+**Dernière mise à jour**: 2026-02-03
 
-**Backend API**: 60 endpoints
+**Backend API**: 64 endpoints
 - 3 endpoints de base (/, /health, /version)
 - 8 endpoints d'authentification (JWT + MFA)
 - 10 endpoints de référentiels (unités, catégories, permissions, rôles)
 - 13 endpoints hiérarchie territoriale (départements, communes)
 - 5 endpoints produits (CRUD)
-- 6 endpoints marchés (CRUD)
-- 8 endpoints collectes de prix (CRUD + validation + stats)
+- 7 endpoints marchés (CRUD + ajout produit)
+- 10 endpoints collectes de prix (CRUD + validation + stats + batch + import CSV/Excel)
 - 6 endpoints alertes (consultation + résolution + stats + génération manuelle)
+- 2 endpoints import collectes (upload fichier + téléchargement templates)
 
 **Frontend**: 7 pages + 3 modules
 - ✅ Pages: login.js, dashboard.js, 404.js

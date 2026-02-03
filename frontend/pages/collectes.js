@@ -897,11 +897,28 @@ export default function CollectesPage() {
         const selectedMarche = marches.find(m => m.id === formData.marche_id);
         if (!selectedMarche || !selectedMarche.produits || selectedMarche.produits.length === 0) {
             const notice = document.createElement('div');
-            notice.className = 'bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center';
-            notice.innerHTML = `
+            notice.className = 'bg-yellow-50 border border-yellow-200 rounded-xl p-6';
+
+            const warningDiv = document.createElement('div');
+            warningDiv.className = 'text-center mb-4';
+            warningDiv.innerHTML = `
                 <p class="text-yellow-800 font-semibold">⚠️ Aucun produit associé à ce marché</p>
-                <p class="text-yellow-600 text-sm mt-2">Veuillez contacter l'administrateur pour configurer les produits de ce marché.</p>
+                <p class="text-yellow-600 text-sm mt-2">Vous pouvez ajouter des produits pour effectuer votre collecte.</p>
             `;
+            notice.appendChild(warningDiv);
+
+            // Bouton pour ajouter un produit
+            const addButton = document.createElement('button');
+            addButton.className = 'w-full py-3 px-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition flex items-center justify-center gap-2';
+            addButton.innerHTML = '<span>+</span> Ajouter un produit pour ce marché';
+            addButton.addEventListener('click', () => {
+                showAddProductForm = true;
+                newProductData = { produit_id: '', unite_id: '' };
+                formData.prix.new_product = { matin1: '', matin2: '', soir1: '', soir2: '' };
+                render();
+            });
+            notice.appendChild(addButton);
+
             return notice;
         }
 
@@ -2396,6 +2413,55 @@ export default function CollectesPage() {
                 type: 'error'
             });
             return;
+        }
+
+        // Identifier les produits à ajouter au marché (produits hors liste)
+        const selectedMarche = marches.find(m => m.id === formData.marche_id);
+        const produitsToAddToMarche = [];
+
+        Object.keys(formData.prix).forEach(produitId => {
+            if (produitId === 'new_product') return; // Ignorer la clé temporaire
+
+            // Vérifier si le produit n'est pas déjà dans le marché
+            const isInMarche = selectedMarche && selectedMarche.produits &&
+                selectedMarche.produits.some(p => p.id_produit === produitId);
+
+            if (!isInMarche) {
+                const produit = produits.find(p => p.id === produitId);
+                if (produit) {
+                    produitsToAddToMarche.push({
+                        produit_id: produitId,
+                        unite_id: produit.id_unite_mesure
+                    });
+                }
+            }
+        });
+
+        // Ajouter les produits au marché si nécessaire
+        if (produitsToAddToMarche.length > 0) {
+            try {
+                const addPromises = produitsToAddToMarche.map(({ produit_id, unite_id }) =>
+                    api.post(`/api/marches/${formData.marche_id}/produits?produit_id=${produit_id}&unite_id=${unite_id}`)
+                );
+
+                await Promise.all(addPromises);
+
+                showToast({
+                    message: `${produitsToAddToMarche.length} produit(s) ajouté(s) au marché`,
+                    type: 'info'
+                });
+
+                // Recharger les données du marché
+                await loadData();
+
+            } catch (error) {
+                console.error('Erreur lors de l\'ajout des produits au marché:', error);
+                showToast({
+                    message: 'Erreur lors de l\'ajout des produits au marché',
+                    type: 'warning'
+                });
+                // On continue quand même la soumission des collectes
+            }
         }
 
         // Collecter tous les prix entrés
