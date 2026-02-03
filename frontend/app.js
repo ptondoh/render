@@ -57,9 +57,8 @@ const routes = {
         title: 'Alertes - SAP',
         requireAuth: true,
         render: async () => {
-            // const { default: AlertesPage } = await import('./pages/alertes.js');
-            // return AlertesPage();
-            return '<div class="text-center py-12"><h2 class="text-2xl font-bold text-gray-900 mb-4">Page Alertes</h2><p class="text-gray-600">À venir - Section 8</p></div>';
+            const { default: AlertesPage } = await import('./pages/alertes.js');
+            return AlertesPage();
         }
     },
     '/profil': {
@@ -223,7 +222,9 @@ class Router {
      */
     getPath() {
         const hash = window.location.hash.slice(1); // Enlever le #
-        return hash || '/';
+        // Séparer le chemin des paramètres de requête
+        const pathWithoutQuery = hash.split('?')[0];
+        return pathWithoutQuery || '/';
     }
 
     /**

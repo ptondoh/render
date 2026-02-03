@@ -15,6 +15,577 @@ export default function CollectesPage() {
 
     const user = auth.getCurrentUser();
     const isAgent = auth.hasRole('agent');
+    const isDecideur = auth.hasRole('décideur');
+
+    // ========================================
+    // VUE DE CONSULTATION POUR LES DÉCIDEURS
+    // ========================================
+    function renderConsultationView() {
+        const consultationContainer = document.createElement('div');
+        consultationContainer.className = 'max-w-7xl mx-auto space-y-6';
+
+        let collectes = [];
+        let filteredCollectes = [];
+        let agents = [];
+        let marches = [];
+        let produits = [];
+        let isLoadingCollectes = true;
+
+        // Filtres
+        let selectedAgent = '';
+        let selectedMarche = '';
+        let selectedProduit = '';
+        let selectedPeriode = '';
+        let selectedStatut = '';
+        let searchTerm = '';
+        let dateDebut = '';
+        let dateFin = '';
+
+        // Pagination
+        let currentPage = 1;
+        let itemsPerPage = 20;
+        let totalPages = 1;
+
+        // Header
+        const header = document.createElement('div');
+        header.className = 'bg-white p-6 rounded-lg shadow-md';
+        header.innerHTML = `
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Consultation des Collectes</h1>
+            <p class="text-gray-600">Toutes les collectes de prix</p>
+        `;
+        consultationContainer.appendChild(header);
+
+        // Conteneur des filtres
+        let filtersContainer = null;
+
+        // Conteneur de la table
+        let tableContainer = null;
+
+        // Conteneur de la pagination
+        let paginationContainer = null;
+
+        // Fonction de rendu des filtres
+        function renderFilters() {
+            const filters = document.createElement('div');
+            filters.className = 'bg-white p-4 rounded-lg shadow-md';
+
+            const title = document.createElement('h3');
+            title.className = 'text-lg font-semibold mb-4';
+            title.textContent = 'Filtres';
+
+            const grid = document.createElement('div');
+            grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4';
+
+            // Filtre Agent
+            const agentDiv = document.createElement('div');
+            agentDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 mb-1">Agent</label>
+                <select id="filter-agent" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    <option value="">Tous les agents</option>
+                    ${agents.map(a => `<option value="${a.id}" ${selectedAgent === a.id ? 'selected' : ''}>${a.nom}</option>`).join('')}
+                </select>
+            `;
+            grid.appendChild(agentDiv);
+
+            // Filtre Marché
+            const marcheDiv = document.createElement('div');
+            marcheDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 mb-1">Marché</label>
+                <select id="filter-marche" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    <option value="">Tous les marchés</option>
+                    ${marches.map(m => `<option value="${m.id}" ${selectedMarche === m.id ? 'selected' : ''}>${m.nom}</option>`).join('')}
+                </select>
+            `;
+            grid.appendChild(marcheDiv);
+
+            // Filtre Produit
+            const produitDiv = document.createElement('div');
+            produitDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 mb-1">Produit</label>
+                <select id="filter-produit" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    <option value="">Tous les produits</option>
+                    ${produits.map(p => `<option value="${p.id}" ${selectedProduit === p.id ? 'selected' : ''}>${p.nom}</option>`).join('')}
+                </select>
+            `;
+            grid.appendChild(produitDiv);
+
+            // Filtre Période
+            const periodeDiv = document.createElement('div');
+            periodeDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 mb-1">Période</label>
+                <select id="filter-periode" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    <option value="">Toutes les périodes</option>
+                    <option value="matin1" ${selectedPeriode === 'matin1' ? 'selected' : ''}>Matin 1</option>
+                    <option value="matin2" ${selectedPeriode === 'matin2' ? 'selected' : ''}>Matin 2</option>
+                    <option value="soir1" ${selectedPeriode === 'soir1' ? 'selected' : ''}>Soir 1</option>
+                    <option value="soir2" ${selectedPeriode === 'soir2' ? 'selected' : ''}>Soir 2</option>
+                </select>
+            `;
+            grid.appendChild(periodeDiv);
+
+            // Filtre Date début
+            const dateDebutDiv = document.createElement('div');
+            dateDebutDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 mb-1">Date début</label>
+                <input type="date" id="filter-date-debut" value="${dateDebut}" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            `;
+            grid.appendChild(dateDebutDiv);
+
+            // Filtre Date fin
+            const dateFinDiv = document.createElement('div');
+            dateFinDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 mb-1">Date fin</label>
+                <input type="date" id="filter-date-fin" value="${dateFin}" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            `;
+            grid.appendChild(dateFinDiv);
+
+            // Recherche
+            const searchDiv = document.createElement('div');
+            searchDiv.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 mb-1">Recherche</label>
+                <input type="text" id="filter-search" value="${searchTerm}" placeholder="Rechercher..." class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            `;
+            grid.appendChild(searchDiv);
+
+            // Bouton réinitialiser
+            const resetDiv = document.createElement('div');
+            resetDiv.className = 'flex items-end';
+            const resetBtn = Button({
+                text: 'Réinitialiser',
+                variant: 'secondary',
+                onClick: () => {
+                    selectedAgent = '';
+                    selectedMarche = '';
+                    selectedProduit = '';
+                    selectedPeriode = '';
+                    searchTerm = '';
+                    dateDebut = '';
+                    dateFin = '';
+                    currentPage = 1;
+                    applyFilters();
+                    updateView();
+                }
+            });
+            resetDiv.appendChild(resetBtn);
+            grid.appendChild(resetDiv);
+
+            filters.appendChild(title);
+            filters.appendChild(grid);
+
+            // Event listeners
+            setTimeout(() => {
+                document.getElementById('filter-agent')?.addEventListener('change', (e) => {
+                    selectedAgent = e.target.value;
+                    currentPage = 1;
+                    applyFilters();
+                    updateTable();
+                    updatePagination();
+                });
+
+                document.getElementById('filter-marche')?.addEventListener('change', (e) => {
+                    selectedMarche = e.target.value;
+                    currentPage = 1;
+                    applyFilters();
+                    updateTable();
+                    updatePagination();
+                });
+
+                document.getElementById('filter-produit')?.addEventListener('change', (e) => {
+                    selectedProduit = e.target.value;
+                    currentPage = 1;
+                    applyFilters();
+                    updateTable();
+                    updatePagination();
+                });
+
+                document.getElementById('filter-periode')?.addEventListener('change', (e) => {
+                    selectedPeriode = e.target.value;
+                    currentPage = 1;
+                    applyFilters();
+                    updateTable();
+                    updatePagination();
+                });
+
+                document.getElementById('filter-date-debut')?.addEventListener('change', (e) => {
+                    dateDebut = e.target.value;
+                    currentPage = 1;
+                    applyFilters();
+                    updateTable();
+                    updatePagination();
+                });
+
+                document.getElementById('filter-date-fin')?.addEventListener('change', (e) => {
+                    dateFin = e.target.value;
+                    currentPage = 1;
+                    applyFilters();
+                    updateTable();
+                    updatePagination();
+                });
+
+                document.getElementById('filter-search')?.addEventListener('input', (e) => {
+                    searchTerm = e.target.value;
+                    currentPage = 1;
+                    applyFilters();
+                    updateTable();
+                    updatePagination();
+                });
+            }, 0);
+
+            return filters;
+        }
+
+        // Fonction de rendu du tableau
+        function renderTable() {
+            const tableCard = document.createElement('div');
+            tableCard.className = 'bg-white rounded-lg shadow-md overflow-hidden';
+
+            if (isLoadingCollectes) {
+                const loader = document.createElement('div');
+                loader.className = 'flex justify-center items-center p-12';
+                loader.appendChild(Spinner({ size: 'lg' }));
+                tableCard.appendChild(loader);
+                return tableCard;
+            }
+
+            if (filteredCollectes.length === 0) {
+                tableCard.innerHTML = `
+                    <div class="text-center py-12">
+                        <p class="text-gray-600 text-lg">Aucune collecte trouvée</p>
+                    </div>
+                `;
+                return tableCard;
+            }
+
+            // Calculer les collectes à afficher pour la page courante
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const collectesPage = filteredCollectes.slice(startIndex, endIndex);
+
+            // Table
+            const tableWrapper = document.createElement('div');
+            tableWrapper.className = 'overflow-x-auto';
+
+            const table = document.createElement('table');
+            table.className = 'min-w-full divide-y divide-gray-200';
+
+            // Header
+            table.innerHTML = `
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Période</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marché</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produit</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantité</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
+                    </tr>
+                </thead>
+            `;
+
+            const tbody = document.createElement('tbody');
+            tbody.className = 'bg-white divide-y divide-gray-200';
+
+            collectesPage.forEach(collecte => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+
+                const dateStr = new Date(collecte.date).toLocaleDateString('fr-FR');
+                const periodeLabel = {
+                    'matin1': 'Matin 1',
+                    'matin2': 'Matin 2',
+                    'soir1': 'Soir 1',
+                    'soir2': 'Soir 2'
+                }[collecte.periode] || collecte.periode || '-';
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${dateStr}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${periodeLabel}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${collecte.marche_nom || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${collecte.produit_nom || '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${collecte.prix} HTG</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${collecte.quantite} ${collecte.unite_nom || ''}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${collecte.agent_nom || 'Agent'}</td>
+                `;
+
+                tbody.appendChild(tr);
+            });
+
+            table.appendChild(tbody);
+            tableWrapper.appendChild(table);
+            tableCard.appendChild(tableWrapper);
+
+            // Stats et sélecteur de pagination
+            const stats = document.createElement('div');
+            stats.className = 'px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center';
+
+            const statsText = document.createElement('p');
+            statsText.className = 'text-sm text-gray-600';
+            statsText.innerHTML = `
+                Affichage de <span class="font-semibold">${startIndex + 1}</span> à <span class="font-semibold">${Math.min(endIndex, filteredCollectes.length)}</span> sur <span class="font-semibold">${filteredCollectes.length}</span> collecte(s)
+            `;
+
+            const itemsPerPageSelector = document.createElement('div');
+            itemsPerPageSelector.className = 'flex items-center gap-2';
+            itemsPerPageSelector.innerHTML = `
+                <label class="text-sm text-gray-600">Afficher:</label>
+                <select id="items-per-page" class="px-3 py-1 border border-gray-300 rounded-md text-sm">
+                    <option value="10" ${itemsPerPage === 10 ? 'selected' : ''}>10</option>
+                    <option value="20" ${itemsPerPage === 20 ? 'selected' : ''}>20</option>
+                    <option value="50" ${itemsPerPage === 50 ? 'selected' : ''}>50</option>
+                    <option value="100" ${itemsPerPage === 100 ? 'selected' : ''}>100</option>
+                </select>
+            `;
+
+            stats.appendChild(statsText);
+            stats.appendChild(itemsPerPageSelector);
+            tableCard.appendChild(stats);
+
+            // Event listener pour le sélecteur
+            setTimeout(() => {
+                document.getElementById('items-per-page')?.addEventListener('change', (e) => {
+                    itemsPerPage = parseInt(e.target.value);
+                    currentPage = 1;
+                    totalPages = Math.ceil(filteredCollectes.length / itemsPerPage);
+                    updateTable();
+                    updatePagination();
+                });
+            }, 0);
+
+            return tableCard;
+        }
+
+        // Fonction de rendu de la pagination
+        function renderPagination() {
+            const pagination = document.createElement('div');
+            pagination.className = 'bg-white p-4 rounded-lg shadow-md flex justify-center gap-2';
+
+            if (totalPages <= 1) {
+                return pagination;
+            }
+
+            // Bouton Précédent
+            const prevBtn = Button({
+                text: '← Précédent',
+                variant: 'secondary',
+                size: 'sm',
+                onClick: () => {
+                    if (currentPage > 1) {
+                        currentPage--;
+                        updateTable();
+                        updatePagination();
+                    }
+                }
+            });
+            prevBtn.disabled = currentPage === 1;
+            pagination.appendChild(prevBtn);
+
+            // Numéros de page
+            const maxButtons = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+            if (endPage - startPage < maxButtons - 1) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = Button({
+                    text: i.toString(),
+                    variant: i === currentPage ? 'primary' : 'secondary',
+                    size: 'sm',
+                    onClick: () => {
+                        currentPage = i;
+                        updateTable();
+                        updatePagination();
+                    }
+                });
+                pagination.appendChild(pageBtn);
+            }
+
+            // Bouton Suivant
+            const nextBtn = Button({
+                text: 'Suivant →',
+                variant: 'secondary',
+                size: 'sm',
+                onClick: () => {
+                    if (currentPage < totalPages) {
+                        currentPage++;
+                        updateTable();
+                        updatePagination();
+                    }
+                }
+            });
+            nextBtn.disabled = currentPage === totalPages;
+            pagination.appendChild(nextBtn);
+
+            return pagination;
+        }
+
+        // Appliquer les filtres
+        function applyFilters() {
+            filteredCollectes = collectes.filter(collecte => {
+                // Filtre agent
+                if (selectedAgent && collecte.agent_id !== selectedAgent) {
+                    return false;
+                }
+
+                // Filtre marché
+                if (selectedMarche && collecte.marche_id !== selectedMarche) {
+                    return false;
+                }
+
+                // Filtre produit
+                if (selectedProduit && collecte.produit_id !== selectedProduit) {
+                    return false;
+                }
+
+                // Filtre période
+                if (selectedPeriode && collecte.periode !== selectedPeriode) {
+                    return false;
+                }
+
+                // Filtre date début
+                if (dateDebut) {
+                    const collecteDate = new Date(collecte.date).toISOString().split('T')[0];
+                    if (collecteDate < dateDebut) {
+                        return false;
+                    }
+                }
+
+                // Filtre date fin
+                if (dateFin) {
+                    const collecteDate = new Date(collecte.date).toISOString().split('T')[0];
+                    if (collecteDate > dateFin) {
+                        return false;
+                    }
+                }
+
+                // Recherche textuelle
+                if (searchTerm) {
+                    const term = searchTerm.toLowerCase();
+                    const searchFields = [
+                        collecte.marche_nom,
+                        collecte.produit_nom,
+                        collecte.agent_nom,
+                        collecte.prix.toString()
+                    ].filter(Boolean).join(' ').toLowerCase();
+
+                    if (!searchFields.includes(term)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            totalPages = Math.ceil(filteredCollectes.length / itemsPerPage);
+        }
+
+        // Mettre à jour le tableau
+        function updateTable() {
+            if (tableContainer && tableContainer.parentNode) {
+                const newTable = renderTable();
+                tableContainer.parentNode.replaceChild(newTable, tableContainer);
+                tableContainer = newTable;
+            }
+        }
+
+        // Mettre à jour la pagination
+        function updatePagination() {
+            if (paginationContainer && paginationContainer.parentNode) {
+                const newPagination = renderPagination();
+                paginationContainer.parentNode.replaceChild(newPagination, paginationContainer);
+                paginationContainer = newPagination;
+            }
+        }
+
+        // Mettre à jour toute la vue
+        function updateView() {
+            if (filtersContainer && filtersContainer.parentNode) {
+                const newFilters = renderFilters();
+                filtersContainer.parentNode.replaceChild(newFilters, filtersContainer);
+                filtersContainer = newFilters;
+            }
+            updateTable();
+            updatePagination();
+        }
+
+        // Charger les données
+        async function loadData() {
+            isLoadingCollectes = true;
+
+            // Rendu initial avec loader
+            const loaderDiv = document.createElement('div');
+            loaderDiv.className = 'flex justify-center items-center p-12';
+            loaderDiv.appendChild(Spinner({ size: 'lg' }));
+            consultationContainer.appendChild(loaderDiv);
+
+            try {
+                // Charger toutes les collectes et les données de référence
+                const [collectesData, marchesData, produitsData] = await Promise.all([
+                    api.get('/api/collectes?limit=1000'),
+                    api.get('/api/marches'),
+                    api.get('/api/produits')
+                ]);
+
+                collectes = collectesData;
+                marches = marchesData;
+                produits = produitsData;
+
+                // Extraire les agents uniques depuis les collectes
+                const agentsMap = new Map();
+                collectes.forEach(c => {
+                    if (c.agent_id && !agentsMap.has(c.agent_id)) {
+                        const nomComplet = c.agent_nom || 'Agent';
+                        agentsMap.set(c.agent_id, {
+                            id: c.agent_id,
+                            nom: nomComplet,  // Nom complet pour affichage
+                            prenom: ''        // Pas besoin de séparer
+                        });
+                    }
+                });
+                agents = Array.from(agentsMap.values());
+
+                applyFilters();
+
+                // Retirer le loader et marquer comme chargé
+                loaderDiv.remove();
+                isLoadingCollectes = false;
+
+                // Rendre les composants APRÈS le chargement des données
+                filtersContainer = renderFilters();
+                tableContainer = renderTable();
+                paginationContainer = renderPagination();
+
+                consultationContainer.appendChild(filtersContainer);
+                consultationContainer.appendChild(tableContainer);
+                consultationContainer.appendChild(paginationContainer);
+
+            } catch (error) {
+                console.error('Erreur chargement:', error);
+                showToast('Erreur lors du chargement des données', 'error');
+                collectes = [];
+                filteredCollectes = [];
+                isLoadingCollectes = false;
+                loaderDiv.remove();
+            }
+        }
+
+        // Charger les données au montage
+        loadData();
+
+        return consultationContainer;
+    }
+
+    // Si décideur, afficher la vue de consultation
+    if (isDecideur) {
+        return renderConsultationView();
+    }
+
+    // ========================================
+    // VUE DE SAISIE POUR LES AGENTS
+    // ========================================
 
     // État
     let isLoading = true;

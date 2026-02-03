@@ -33,7 +33,7 @@ async def calculer_prix_reference(produit_id: str, marche_id: Optional[str] = No
 
     query = {
         "produit_id": produit_id,
-        "statut": "validée",
+        "statut": "validee",
         "date": {"$gte": date_limite}
     }
 
@@ -100,25 +100,45 @@ async def generer_alertes_pour_collecte(collecte_id: str):
     niveau = determiner_niveau_alerte(collecte["prix"], prix_ref)
 
     if niveau == "normal":
-        return  # Pas besoin de créer une alerte
+        # Prix revenu à la normale : fermer l'alerte existante si elle existe
+        existing_alerte = await db.alertes.find_one({
+            "marche_id": collecte["marche_id"],
+            "produit_id": collecte["produit_id"],
+            "statut": "active"
+        })
+
+        if existing_alerte:
+            await db.alertes.update_one(
+                {"_id": existing_alerte["_id"]},
+                {
+                    "$set": {
+                        "statut": "resolue",
+                        "resolved_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow()
+                    }
+                }
+            )
+
+        return  # Pas besoin de créer une nouvelle alerte
 
     # Calculer l'écart en pourcentage
     ecart_pourcent = ((collecte["prix"] - prix_ref) / prix_ref) * 100
 
-    # Vérifier si une alerte similaire existe déjà (même marché/produit, active)
+    # Vérifier si une alerte existe déjà pour ce marché/produit (active)
+    # On ne filtre PAS par niveau pour éviter les doublons si le niveau change
     existing_alerte = await db.alertes.find_one({
         "marche_id": collecte["marche_id"],
         "produit_id": collecte["produit_id"],
-        "statut": "active",
-        "niveau": niveau
+        "statut": "active"
     })
 
     if existing_alerte:
-        # Mettre à jour l'alerte existante
+        # Mettre à jour l'alerte existante avec le nouveau niveau et prix
         await db.alertes.update_one(
             {"_id": existing_alerte["_id"]},
             {
                 "$set": {
+                    "niveau": niveau,  # IMPORTANT: mettre à jour le niveau aussi
                     "prix_actuel": collecte["prix"],
                     "prix_reference": prix_ref,
                     "ecart_pourcentage": ecart_pourcent,
@@ -196,13 +216,32 @@ async def get_alertes(
                     if dept:
                         departement_nom = dept["nom"]
 
+        # Extraire les coordonnées GPS du marché
+        marche_gps = None
+        if marche:
+            if marche.get("latitude") and marche.get("longitude"):
+                marche_gps = {
+                    "latitude": marche["latitude"],
+                    "longitude": marche["longitude"]
+                }
+            elif marche.get("location") and marche["location"].get("coordinates"):
+                # Format GeoJSON: coordinates = [longitude, latitude]
+                coords = marche["location"]["coordinates"]
+                marche_gps = {
+                    "latitude": coords[1],
+                    "longitude": coords[0]
+                }
+
         result.append({
             "id": str(alerte["_id"]),
             "niveau": alerte["niveau"],
             "type_alerte": alerte["type_alerte"],
             "marche_id": alerte["marche_id"],
             "marche_nom": marche_nom,
+            "marche_gps": marche_gps,
+            "commune_id": marche.get('commune_id') if marche else None,
             "commune_nom": commune_nom,
+            "departement_id": commune.get('departement_id') if commune else None,
             "departement_nom": departement_nom,
             "produit_id": alerte["produit_id"],
             "produit_nom": produit_nom,
@@ -402,7 +441,7 @@ async def generer_alertes_manuellement(
     date_limite = datetime.utcnow() - timedelta(days=7)
 
     collectes = await db.collectes_prix.find({
-        "statut": "validée",
+        "statut": "validee",
         "date": {"$gte": date_limite}
     }).to_list(None)
 
@@ -427,15 +466,29 @@ async def generer_alertes_manuellement(
         # Calculer l'écart
         ecart_pourcent = ((collecte["prix"] - prix_ref) / prix_ref) * 100
 
-        # Vérifier si une alerte existe déjà
+        # Vérifier si une alerte existe déjà pour ce marché/produit (active)
+        # On ne filtre PAS par niveau pour éviter les doublons
         existing = await db.alertes.find_one({
             "marche_id": collecte["marche_id"],
             "produit_id": collecte["produit_id"],
-            "statut": "active",
-            "niveau": niveau
+            "statut": "active"
         })
 
-        if not existing:
+        if existing:
+            # Mettre à jour l'alerte existante avec les nouvelles données
+            await db.alertes.update_one(
+                {"_id": existing["_id"]},
+                {
+                    "$set": {
+                        "niveau": niveau,
+                        "prix_actuel": collecte["prix"],
+                        "prix_reference": prix_ref,
+                        "ecart_pourcentage": ecart_pourcent,
+                        "updated_at": datetime.utcnow()
+                    }
+                }
+            )
+        else:
             # Créer une nouvelle alerte
             alerte = {
                 "niveau": niveau,

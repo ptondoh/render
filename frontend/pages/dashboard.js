@@ -60,9 +60,16 @@ export default function DashboardPage() {
     }
 
     // Carte de statistiques
-    function renderStatCard(title, value, description, variant = 'default') {
+    function renderStatCard(title, value, description, variant = 'default', onClick = null) {
         const card = document.createElement('div');
-        card.className = 'bg-white rounded-lg shadow-md border border-gray-200 p-6';
+
+        // Ajouter les classes de base et le style cliquable si onClick est fourni
+        if (onClick) {
+            card.className = 'bg-white rounded-lg shadow-md border border-gray-200 p-6 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all';
+            card.onclick = onClick;
+        } else {
+            card.className = 'bg-white rounded-lg shadow-md border border-gray-200 p-6';
+        }
 
         const titleEl = document.createElement('h3');
         titleEl.className = 'text-sm font-medium text-gray-600 mb-2';
@@ -137,7 +144,7 @@ export default function DashboardPage() {
                         text: '+ Nouvelle collecte',
                         variant: 'primary',
                         size: 'lg',
-                        onClick: () => window.location.hash = '#/collectes/nouvelle'
+                        onClick: () => window.location.hash = '#/collectes'
                     });
 
                     div.appendChild(btn);
@@ -180,62 +187,37 @@ export default function DashboardPage() {
 
         // Statistiques
         const statsGrid = document.createElement('div');
-        statsGrid.className = 'grid grid-cols-1 md:grid-cols-4 gap-6';
+        statsGrid.className = 'grid grid-cols-1 md:grid-cols-3 gap-6';
 
         if (stats) {
-            statsGrid.appendChild(renderStatCard(
-                'Collectes en attente',
-                stats.en_attente || 0,
-                'À valider',
-                'warning'
-            ));
-
             statsGrid.appendChild(renderStatCard(
                 'Alertes actives',
                 stats.alertes_actives || 0,
                 'Nécessitent attention',
-                'danger'
+                'danger',
+                () => window.location.hash = '#/alertes'
             ));
 
             statsGrid.appendChild(renderStatCard(
                 'Alertes urgentes',
                 stats.alertes_urgentes || 0,
                 'Niveau urgence',
-                'danger'
+                'danger',
+                () => window.location.hash = '#/alertes?niveau=urgence'
             ));
 
             statsGrid.appendChild(renderStatCard(
                 'Marchés surveillés',
                 stats.marches_surveilles || 0,
-                'Avec prix élevés'
+                'Avec prix élevés',
+                'default',
+                () => window.location.hash = '#/alertes'
             ));
         }
 
         content.appendChild(statsGrid);
 
         // Actions rapides
-        const actionsGrid = document.createElement('div');
-        actionsGrid.className = 'grid grid-cols-1 md:grid-cols-2 gap-6';
-
-        const validateCard = Card({
-            title: 'Validation des collectes',
-            children: [
-                (() => {
-                    const div = document.createElement('div');
-                    div.className = 'text-center py-4';
-
-                    const btn = Button({
-                        text: 'Voir les collectes en attente',
-                        variant: 'primary',
-                        onClick: () => window.location.hash = '#/collectes?statut=soumise'
-                    });
-
-                    div.appendChild(btn);
-                    return div;
-                })()
-            ]
-        });
-
         const alertesCard = Card({
             title: 'Gestion des alertes',
             children: [
@@ -255,10 +237,7 @@ export default function DashboardPage() {
             ]
         });
 
-        actionsGrid.appendChild(validateCard);
-        actionsGrid.appendChild(alertesCard);
-
-        content.appendChild(actionsGrid);
+        content.appendChild(alertesCard);
 
         // Alertes récentes
         if (alertes && alertes.length > 0) {
@@ -345,7 +324,7 @@ export default function DashboardPage() {
     function renderCollecteItem(collecte) {
         const item = document.createElement('div');
         item.className = 'flex justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
-        item.onclick = () => window.location.hash = `#/collectes/${collecte.id}`;
+        item.onclick = () => window.location.hash = '#/collectes';
 
         const left = document.createElement('div');
         left.className = 'flex-1';
@@ -376,7 +355,7 @@ export default function DashboardPage() {
     function renderAlerteItem(alerte) {
         const item = document.createElement('div');
         item.className = 'flex justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
-        item.onclick = () => window.location.hash = `#/alertes/${alerte.id}`;
+        item.onclick = () => window.location.hash = '#/alertes';
 
         const left = document.createElement('div');
         left.className = 'flex-1';
@@ -427,14 +406,12 @@ export default function DashboardPage() {
                 collectes = collectesData;
 
             } else if (user.role === 'décideur') {
-                const [collectesStats, alertesStats, alertesData] = await Promise.all([
-                    api.get('/api/collectes/statistiques/resume'),
+                const [alertesStats, alertesData] = await Promise.all([
                     api.get('/api/alertes/statistiques/resume'),
                     api.get('/api/alertes?limit=10')
                 ]);
 
                 stats = {
-                    en_attente: collectesStats.par_statut?.soumise || 0,
                     alertes_actives: alertesStats.total_alertes_actives || 0,
                     alertes_urgentes: alertesStats.par_niveau?.urgence || 0,
                     marches_surveilles: 0 // À implémenter

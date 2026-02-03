@@ -73,7 +73,7 @@ async def get_collectes(
             date_query["$lte"] = datetime.fromisoformat(date_fin)
         query["date"] = date_query
 
-    collectes = await db.collectes.find(query).sort("date", -1).limit(limit).to_list(None)
+    collectes = await db.collectes_prix.find(query).sort("date", -1).limit(limit).to_list(None)
 
     # Enrichir les données avec les noms
     result = []
@@ -125,7 +125,7 @@ async def get_collecte(
             detail="ID de collecte invalide"
         )
 
-    collecte = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
+    collecte = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
     if not collecte:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -242,7 +242,7 @@ async def create_collecte(
     if collecte.periode:
         duplicate_query["periode"] = collecte.periode
 
-    existing = await db.collectes.find_one(duplicate_query)
+    existing = await db.collectes_prix.find_one(duplicate_query)
 
     if existing:
         detail_msg = "Une collecte existe déjà pour ce marché/produit/unité/date"
@@ -255,12 +255,23 @@ async def create_collecte(
 
     collecte_dict = collecte.model_dump(exclude_none=False)
     collecte_dict["agent_id"] = current_user.id
-    collecte_dict["statut"] = "soumise"
+    collecte_dict["statut"] = "validee"  # Validation automatique pour temps réel
+    collecte_dict["validee_at"] = datetime.utcnow()
     collecte_dict["created_at"] = datetime.utcnow()
     collecte_dict["synced_at"] = datetime.utcnow()
 
-    result = await db.collectes.insert_one(collecte_dict)
-    created_collecte = await db.collectes.find_one({"_id": result.inserted_id})
+    result = await db.collectes_prix.insert_one(collecte_dict)
+    created_collecte = await db.collectes_prix.find_one({"_id": result.inserted_id})
+
+    # Générer des alertes automatiquement en temps réel
+    collecte_id = str(created_collecte["_id"])
+    try:
+        from backend.routers.alertes import generer_alertes_pour_collecte
+        await generer_alertes_pour_collecte(collecte_id)
+    except Exception as e:
+        # Ne pas bloquer la création si la génération d'alertes échoue
+        import logging
+        logging.error(f"Erreur lors de la génération d'alertes: {e}")
 
     return CollecteResponse(
         id=str(created_collecte["_id"]),
@@ -352,7 +363,7 @@ async def create_collectes_batch(
             if collecte.periode:
                 duplicate_query["periode"] = collecte.periode
 
-            existing = await db.collectes.find_one(duplicate_query)
+            existing = await db.collectes_prix.find_one(duplicate_query)
             if existing:
                 skipped_count += 1
                 continue
@@ -360,12 +371,21 @@ async def create_collectes_batch(
             # Créer la collecte
             collecte_dict = collecte.model_dump(exclude_none=False)
             collecte_dict["agent_id"] = current_user.id
-            collecte_dict["statut"] = "soumise"
+            collecte_dict["statut"] = "validee"  # Validation automatique pour temps réel
+            collecte_dict["validee_at"] = datetime.utcnow()
             collecte_dict["created_at"] = datetime.utcnow()
             collecte_dict["synced_at"] = datetime.utcnow()
 
-            await db.collectes.insert_one(collecte_dict)
+            result = await db.collectes_prix.insert_one(collecte_dict)
             created_count += 1
+
+            # Générer des alertes automatiquement en temps réel
+            try:
+                from backend.routers.alertes import generer_alertes_pour_collecte
+                await generer_alertes_pour_collecte(str(result.inserted_id))
+            except Exception as e:
+                import logging
+                logging.error(f"Erreur lors de la génération d'alertes (batch): {e}")
 
         except Exception as e:
             errors.append(f"Collecte {idx+1}: {str(e)}")
@@ -396,7 +416,7 @@ async def update_collecte(
             detail="ID de collecte invalide"
         )
 
-    existing = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
+    existing = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
     if not existing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -417,12 +437,12 @@ async def update_collecte(
     collecte_dict = collecte.model_dump(exclude_none=False)
     collecte_dict["updated_at"] = datetime.utcnow()
 
-    await db.collectes.update_one(
+    await db.collectes_prix.update_one(
         {"_id": ObjectId(collecte_id)},
         {"$set": collecte_dict}
     )
 
-    updated_collecte = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
+    updated_collecte = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
 
     # Enrichir avec les noms
     marche = await db.marches.find_one({"_id": ObjectId(updated_collecte["marche_id"])})
@@ -471,7 +491,7 @@ async def delete_collecte(
             detail="ID de collecte invalide"
         )
 
-    existing = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
+    existing = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
     if not existing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -489,7 +509,7 @@ async def delete_collecte(
             detail="Impossible de supprimer cette collecte"
         )
 
-    await db.collectes.delete_one({"_id": ObjectId(collecte_id)})
+    await db.collectes_prix.delete_one({"_id": ObjectId(collecte_id)})
 
     return MessageResponse(message="Collecte supprimée avec succès")
 
@@ -511,7 +531,7 @@ async def valider_collecte(
             detail="ID de collecte invalide"
         )
 
-    collecte = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
+    collecte = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
     if not collecte:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -524,11 +544,11 @@ async def valider_collecte(
             detail="Cette collecte est déjà validée"
         )
 
-    await db.collectes.update_one(
+    await db.collectes_prix.update_one(
         {"_id": ObjectId(collecte_id)},
         {
             "$set": {
-                "statut": "validée",
+                "statut": "validee",
                 "validee_par": current_user.id,
                 "validee_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow()
@@ -536,7 +556,7 @@ async def valider_collecte(
         }
     )
 
-    updated_collecte = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
+    updated_collecte = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
 
     # Générer des alertes automatiquement
     try:
@@ -593,18 +613,18 @@ async def rejeter_collecte(
             detail="ID de collecte invalide"
         )
 
-    collecte = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
+    collecte = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
     if not collecte:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Collecte non trouvée"
         )
 
-    await db.collectes.update_one(
+    await db.collectes_prix.update_one(
         {"_id": ObjectId(collecte_id)},
         {
             "$set": {
-                "statut": "rejetée",
+                "statut": "rejetee",
                 "motif_rejet": motif,
                 "validee_par": current_user.id,
                 "validee_at": datetime.utcnow(),
@@ -613,7 +633,7 @@ async def rejeter_collecte(
         }
     )
 
-    updated_collecte = await db.collectes.find_one({"_id": ObjectId(collecte_id)})
+    updated_collecte = await db.collectes_prix.find_one({"_id": ObjectId(collecte_id)})
 
     # Enrichir avec les noms
     marche = await db.marches.find_one({"_id": ObjectId(updated_collecte["marche_id"])})
@@ -676,14 +696,14 @@ async def get_statistiques_collectes(
         query["date"] = date_query
 
     # Compter total
-    total = await db.collectes.count_documents(query)
+    total = await db.collectes_prix.count_documents(query)
 
     # Répartition par statut
     pipeline_statut = [
         {"$match": query},
         {"$group": {"_id": "$statut", "count": {"$sum": 1}}}
     ]
-    statuts = await db.collectes.aggregate(pipeline_statut).to_list(None)
+    statuts = await db.collectes_prix.aggregate(pipeline_statut).to_list(None)
 
     stats = {
         "total_collectes": total,
@@ -700,7 +720,7 @@ async def get_statistiques_collectes(
             {"$match": query},
             {"$group": {"_id": "$agent_id", "count": {"$sum": 1}}}
         ]
-        agents = await db.collectes.aggregate(pipeline_agent).to_list(None)
+        agents = await db.collectes_prix.aggregate(pipeline_agent).to_list(None)
         stats["par_agent"] = {a["_id"]: a["count"] for a in agents}
 
     return stats
