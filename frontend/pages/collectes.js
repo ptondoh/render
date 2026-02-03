@@ -1485,6 +1485,550 @@ export default function CollectesPage() {
         return row;
     }
 
+    // État de l'import
+    let isImporting = false;
+    let importResult = null;
+    let importPreview = null; // Données d'aperçu avant confirmation
+
+    // Section d'import de fichier CSV/Excel
+    function renderImportSection() {
+        const section = document.createElement('div');
+        section.className = 'bg-gradient-to-r from-green-50 to-blue-50 rounded-xl shadow-lg p-6 border-2 border-green-200';
+
+        // Header
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between mb-4';
+
+        const titleDiv = document.createElement('div');
+        const title = document.createElement('h3');
+        title.className = 'text-xl font-bold text-gray-800';
+        title.textContent = 'Import de fichier CSV/Excel';
+
+        const subtitle = document.createElement('p');
+        subtitle.className = 'text-sm text-gray-600 mt-1';
+        subtitle.textContent = 'Importez plusieurs collectes en une fois';
+
+        titleDiv.appendChild(title);
+        titleDiv.appendChild(subtitle);
+
+        header.appendChild(titleDiv);
+        section.appendChild(header);
+
+        // Boutons de téléchargement des templates
+        const templatesDiv = document.createElement('div');
+        templatesDiv.className = 'mb-4';
+
+        const templatesLabel = document.createElement('p');
+        templatesLabel.className = 'text-sm font-medium text-gray-700 mb-2';
+        templatesLabel.textContent = 'Télécharger un template:';
+
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'flex gap-3';
+
+        const excelBtn = Button({
+            text: '📊 Template Excel',
+            variant: 'secondary',
+            size: 'sm',
+            onClick: () => downloadTemplate('excel')
+        });
+
+        const csvBtn = Button({
+            text: '📄 Template CSV',
+            variant: 'secondary',
+            size: 'sm',
+            onClick: () => downloadTemplate('csv')
+        });
+
+        buttonsDiv.appendChild(excelBtn);
+        buttonsDiv.appendChild(csvBtn);
+
+        templatesDiv.appendChild(templatesLabel);
+        templatesDiv.appendChild(buttonsDiv);
+        section.appendChild(templatesDiv);
+
+        // Zone de dépôt de fichier
+        const uploadDiv = document.createElement('div');
+        const isDisabled = importPreview || isImporting;
+        uploadDiv.className = `border-2 border-dashed ${isDisabled ? 'border-gray-300 bg-gray-100 cursor-not-allowed opacity-50' : 'border-green-300 bg-white hover:border-green-500 cursor-pointer'} rounded-lg p-6 transition-colors`;
+        uploadDiv.id = 'file-drop-zone';
+
+        const uploadContent = document.createElement('div');
+        uploadContent.className = 'text-center';
+
+        const uploadIcon = document.createElement('div');
+        uploadIcon.className = 'text-5xl mb-2';
+        uploadIcon.textContent = '📁';
+
+        const uploadText = document.createElement('p');
+        uploadText.className = 'text-gray-700 font-medium mb-1';
+        uploadText.textContent = 'Cliquez pour sélectionner un fichier';
+
+        const uploadSubtext = document.createElement('p');
+        uploadSubtext.className = 'text-sm text-gray-500';
+        uploadSubtext.textContent = 'ou glissez-déposez un fichier CSV ou Excel';
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.csv,.xlsx,.xls';
+        fileInput.className = 'hidden';
+        fileInput.id = 'file-input';
+
+        uploadContent.appendChild(uploadIcon);
+        uploadContent.appendChild(uploadText);
+        uploadContent.appendChild(uploadSubtext);
+        uploadContent.appendChild(fileInput);
+
+        uploadDiv.appendChild(uploadContent);
+        section.appendChild(uploadDiv);
+
+        // Événements de drag & drop (désactivés si aperçu ou import en cours)
+        if (!isDisabled) {
+            uploadDiv.addEventListener('click', () => fileInput.click());
+
+            uploadDiv.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadDiv.classList.add('border-green-500', 'bg-green-50');
+            });
+
+            uploadDiv.addEventListener('dragleave', () => {
+                uploadDiv.classList.remove('border-green-500', 'bg-green-50');
+            });
+
+            uploadDiv.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadDiv.classList.remove('border-green-500', 'bg-green-50');
+
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFileUpload(files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileUpload(e.target.files[0]);
+                }
+            });
+        }
+
+        // Afficher le résultat de l'import si disponible
+        if (importResult) {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'mt-4';
+
+            if (importResult.success) {
+                resultDiv.innerHTML = `
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="text-2xl mr-3">✅</div>
+                            <div>
+                                <h4 class="font-bold text-green-800 mb-1">Import réussi!</h4>
+                                <p class="text-sm text-green-700">
+                                    ${importResult.collectes_creees} collecte(s) importée(s) sur ${importResult.total_lignes} ligne(s)
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                const errorsList = importResult.errors.join('<br>');
+                resultDiv.innerHTML = `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <div class="text-2xl mr-3">❌</div>
+                            <div class="flex-1">
+                                <h4 class="font-bold text-red-800 mb-2">Erreurs de validation</h4>
+                                <div class="text-sm text-red-700 max-h-60 overflow-y-auto">
+                                    ${errorsList}
+                                </div>
+                                <p class="text-xs text-red-600 mt-2">
+                                    Lignes valides: ${importResult.lignes_valides} / ${importResult.total_lignes}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            section.appendChild(resultDiv);
+        }
+
+        // Afficher l'aperçu avant confirmation
+        if (importPreview) {
+            const previewDiv = document.createElement('div');
+            previewDiv.className = 'mt-6 bg-white border-2 border-blue-300 rounded-lg p-4';
+
+            const previewHeader = document.createElement('div');
+            previewHeader.className = 'flex items-center justify-between mb-4';
+
+            const previewTitle = document.createElement('h4');
+            previewTitle.className = 'text-lg font-bold text-gray-800';
+            previewTitle.textContent = `Aperçu: ${importPreview.fileName}`;
+
+            const previewInfo = document.createElement('p');
+            previewInfo.className = 'text-sm text-gray-600';
+            previewInfo.textContent = `${importPreview.totalRows} ligne(s) à importer`;
+
+            previewHeader.appendChild(previewTitle);
+            previewHeader.appendChild(previewInfo);
+            previewDiv.appendChild(previewHeader);
+
+            // Tableau d'aperçu
+            const tableContainer = document.createElement('div');
+            tableContainer.className = 'overflow-x-auto max-h-96 overflow-y-auto mb-4';
+
+            const table = document.createElement('table');
+            table.className = 'min-w-full border border-gray-300 text-sm';
+
+            // En-têtes
+            const thead = document.createElement('thead');
+            thead.className = 'bg-gray-100 sticky top-0';
+            const headerRow = document.createElement('tr');
+
+            importPreview.headers.forEach(header => {
+                const th = document.createElement('th');
+                th.className = 'px-3 py-2 border border-gray-300 text-left font-semibold text-gray-700';
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // Corps du tableau
+            const tbody = document.createElement('tbody');
+
+            importPreview.rows.slice(0, 20).forEach((row, idx) => { // Afficher max 20 lignes
+                const tr = document.createElement('tr');
+                tr.className = idx % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+
+                importPreview.headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.className = 'px-3 py-2 border border-gray-300 text-gray-800';
+                    td.textContent = row[header] || '';
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
+            });
+
+            table.appendChild(tbody);
+            tableContainer.appendChild(table);
+            previewDiv.appendChild(tableContainer);
+
+            // Message si plus de 20 lignes
+            if (importPreview.rows.length > 20) {
+                const moreInfo = document.createElement('p');
+                moreInfo.className = 'text-xs text-gray-500 italic mb-4';
+                moreInfo.textContent = `... et ${importPreview.rows.length - 20} ligne(s) supplémentaire(s)`;
+                previewDiv.appendChild(moreInfo);
+            }
+
+            // Boutons de confirmation
+            const buttonsDiv = document.createElement('div');
+            buttonsDiv.className = 'flex gap-3 justify-end';
+
+            const cancelBtn = Button({
+                text: 'Annuler',
+                variant: 'secondary',
+                onClick: cancelImport
+            });
+
+            const confirmBtn = Button({
+                text: `Confirmer l'import (${importPreview.totalRows} ligne${importPreview.totalRows > 1 ? 's' : ''})`,
+                variant: 'primary',
+                onClick: confirmImport
+            });
+
+            buttonsDiv.appendChild(cancelBtn);
+            buttonsDiv.appendChild(confirmBtn);
+            previewDiv.appendChild(buttonsDiv);
+
+            section.appendChild(previewDiv);
+        }
+
+        // Afficher le spinner pendant l'import
+        if (isImporting) {
+            const spinnerDiv = document.createElement('div');
+            spinnerDiv.className = 'mt-4 flex items-center justify-center py-4';
+            spinnerDiv.appendChild(Spinner({ size: 'md' }));
+
+            const loadingText = document.createElement('p');
+            loadingText.className = 'ml-3 text-gray-600';
+            loadingText.textContent = 'Import en cours...';
+
+            spinnerDiv.appendChild(loadingText);
+            section.appendChild(spinnerDiv);
+        }
+
+        return section;
+    }
+
+    // Télécharger le template
+    async function downloadTemplate(format) {
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch(`http://localhost:8000/api/collectes/import/template?format=${format}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Erreur lors du téléchargement du template');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `template_collecte_prix.${format === 'excel' ? 'xlsx' : 'csv'}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            showToast({
+                message: 'Template téléchargé avec succès',
+                type: 'success'
+            });
+        } catch (error) {
+            console.error('Erreur téléchargement template:', error);
+            showToast({
+                message: 'Erreur lors du téléchargement du template',
+                type: 'error'
+            });
+        }
+    }
+
+    // Parser un fichier CSV
+    function parseCSV(text) {
+        const lines = text.split('\n').filter(line => line.trim());
+
+        if (lines.length <= 1) {
+            throw new Error('Le fichier CSV est vide ou ne contient pas de données');
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().replace(/["\uFEFF]/g, ''));
+        const rows = [];
+
+        for (let i = 1; i < lines.length && i <= 100; i++) {
+            const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+            if (values.length === headers.length) {
+                const row = {};
+                headers.forEach((header, index) => {
+                    row[header] = values[index];
+                });
+                rows.push(row);
+            }
+        }
+
+        return {
+            headers: headers,
+            rows: rows,
+            totalRows: lines.length - 1
+        };
+    }
+
+    // Parser un fichier Excel
+    async function parseExcel(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+
+                    // Lire la première feuille "Données"
+                    let sheetName = 'Données';
+                    if (!workbook.SheetNames.includes(sheetName)) {
+                        sheetName = workbook.SheetNames[0]; // Utiliser la première feuille si "Données" n'existe pas
+                    }
+
+                    const worksheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    if (jsonData.length <= 1) {
+                        throw new Error('Le fichier Excel est vide ou ne contient pas de données');
+                    }
+
+                    const headers = jsonData[0].map(h => String(h).trim());
+                    const rows = [];
+
+                    for (let i = 1; i < jsonData.length && i <= 100; i++) {
+                        const values = jsonData[i];
+                        if (values && values.length > 0) {
+                            const row = {};
+                            headers.forEach((header, index) => {
+                                row[header] = values[index] !== undefined ? String(values[index]).trim() : '';
+                            });
+                            rows.push(row);
+                        }
+                    }
+
+                    resolve({
+                        headers: headers,
+                        rows: rows,
+                        totalRows: jsonData.length - 1
+                    });
+
+                } catch (error) {
+                    reject(error);
+                }
+            };
+
+            reader.onerror = function() {
+                reject(new Error('Erreur lors de la lecture du fichier Excel'));
+            };
+
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    // Gérer l'upload du fichier
+    async function handleFileUpload(file) {
+        // Vérifier le type de fichier
+        const validExtensions = ['.csv', '.xlsx', '.xls'];
+        const fileName = file.name.toLowerCase();
+        const isValid = validExtensions.some(ext => fileName.endsWith(ext));
+
+        if (!isValid) {
+            showToast({
+                message: 'Format de fichier non supporté. Utilisez CSV ou Excel (.xlsx, .xls)',
+                type: 'error'
+            });
+            return;
+        }
+
+        // Vérifier la taille (max 10 MB)
+        if (file.size > 10 * 1024 * 1024) {
+            showToast({
+                message: 'Fichier trop volumineux (max 10 MB)',
+                type: 'error'
+            });
+            return;
+        }
+
+        try {
+            isImporting = true;
+            importResult = null;
+            importPreview = null;
+            render();
+
+            let parsedData;
+
+            // Détecter et parser selon le type de fichier
+            if (fileName.endsWith('.csv')) {
+                const fileContent = await file.text();
+                parsedData = parseCSV(fileContent);
+            } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                parsedData = await parseExcel(file);
+            } else {
+                throw new Error('Type de fichier non reconnu');
+            }
+
+            importPreview = {
+                fileName: file.name,
+                file: file,
+                headers: parsedData.headers,
+                rows: parsedData.rows,
+                totalRows: parsedData.totalRows
+            };
+
+            isImporting = false;
+            render();
+
+        } catch (error) {
+            console.error('Erreur lecture fichier:', error);
+            showToast({
+                message: error.message || 'Erreur lors de la lecture du fichier',
+                type: 'error'
+            });
+            isImporting = false;
+            importPreview = null;
+            render();
+        }
+    }
+
+    // Confirmer et sauvegarder l'import
+    async function confirmImport() {
+        if (!importPreview || !importPreview.file) return;
+
+        try {
+            isImporting = true;
+            render();
+
+            const formData = new FormData();
+            formData.append('file', importPreview.file);
+
+            const token = localStorage.getItem('access_token');
+            const response = await fetch('http://localhost:8000/api/collectes/import', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                // Erreur de validation
+                if (data.detail && data.detail.errors) {
+                    importResult = {
+                        success: false,
+                        errors: data.detail.errors,
+                        total_lignes: data.detail.total_lignes,
+                        lignes_valides: data.detail.lignes_valides
+                    };
+                } else {
+                    throw new Error(data.detail || 'Erreur lors de l\'import');
+                }
+            } else {
+                // Succès
+                importResult = {
+                    success: true,
+                    collectes_creees: data.collectes_creees,
+                    total_lignes: data.total_lignes
+                };
+
+                showToast({
+                    message: `${data.collectes_creees} collecte(s) importée(s) avec succès!`,
+                    type: 'success'
+                });
+
+                // Réinitialiser après 3 secondes
+                setTimeout(() => {
+                    importResult = null;
+                    importPreview = null;
+                    render();
+                }, 3000);
+            }
+        } catch (error) {
+            console.error('Erreur import:', error);
+            showToast({
+                message: error.message || 'Erreur lors de l\'import',
+                type: 'error'
+            });
+            importResult = {
+                success: false,
+                errors: [error.message]
+            };
+        } finally {
+            isImporting = false;
+            importPreview = null;
+            render();
+        }
+    }
+
+    // Annuler l'import
+    function cancelImport() {
+        importPreview = null;
+        importResult = null;
+        render();
+    }
+
     // Formulaire d'ajout de produit hors liste (ANCIEN - à supprimer si plus utilisé)
     function renderAddProductForm() {
         const formDiv = document.createElement('div');
@@ -2087,6 +2631,29 @@ export default function CollectesPage() {
     }
 
     // Fonction de rendu
+    // Séparateur visuel "OU"
+    function renderDivider() {
+        const divider = document.createElement('div');
+        divider.className = 'relative my-8';
+
+        const line = document.createElement('div');
+        line.className = 'absolute inset-0 flex items-center';
+        line.innerHTML = '<div class="w-full border-t border-gray-300"></div>';
+
+        const textContainer = document.createElement('div');
+        textContainer.className = 'relative flex justify-center text-sm';
+
+        const text = document.createElement('span');
+        text.className = 'px-4 bg-gray-50 text-gray-500 font-medium';
+        text.textContent = 'OU';
+
+        textContainer.appendChild(text);
+        divider.appendChild(line);
+        divider.appendChild(textContainer);
+
+        return divider;
+    }
+
     function render() {
         container.innerHTML = '';
 
@@ -2094,6 +2661,8 @@ export default function CollectesPage() {
             container.appendChild(renderLoader());
         } else {
             container.appendChild(renderHeader());
+            container.appendChild(renderImportSection());
+            container.appendChild(renderDivider());
             container.appendChild(renderLocationSection());
             container.appendChild(renderProduitsSection());
             container.appendChild(renderCommentaireSection());

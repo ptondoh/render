@@ -24,7 +24,8 @@ from backend.routers import (
     produits as produits_router,
     marches as marches_router,
     collectes as collectes_router,
-    alertes as alertes_router
+    alertes as alertes_router,
+    import_collectes as import_collectes_router
 )
 
 # Configuration du logging
@@ -135,6 +136,7 @@ app.include_router(produits_router.router)
 app.include_router(marches_router.router)
 app.include_router(collectes_router.router)
 app.include_router(alertes_router.router)
+app.include_router(import_collectes_router.router)
 
 
 # ============================================================================
