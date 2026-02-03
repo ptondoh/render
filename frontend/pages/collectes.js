@@ -895,7 +895,9 @@ export default function CollectesPage() {
         }
 
         const selectedMarche = marches.find(m => m.id === formData.marche_id);
-        if (!selectedMarche || !selectedMarche.produits || selectedMarche.produits.length === 0) {
+        const hasNoProducts = !selectedMarche || !selectedMarche.produits || selectedMarche.produits.length === 0;
+
+        if (hasNoProducts && !showAddProductForm) {
             const notice = document.createElement('div');
             notice.className = 'bg-yellow-50 border border-yellow-200 rounded-xl p-6';
 
@@ -903,14 +905,14 @@ export default function CollectesPage() {
             warningDiv.className = 'text-center mb-4';
             warningDiv.innerHTML = `
                 <p class="text-yellow-800 font-semibold">⚠️ Aucun produit associé à ce marché</p>
-                <p class="text-yellow-600 text-sm mt-2">Vous pouvez ajouter des produits pour effectuer votre collecte.</p>
+                <p class="text-yellow-600 text-sm mt-2">Contacter votre administrateur pour configurer les produits de ce marché ou cliquez ci-dessous pour commencer une collecte.</p>
             `;
             notice.appendChild(warningDiv);
 
-            // Bouton pour ajouter un produit
+            // Bouton pour faire une collecte
             const addButton = document.createElement('button');
             addButton.className = 'w-full py-3 px-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition flex items-center justify-center gap-2';
-            addButton.innerHTML = '<span>+</span> Ajouter un produit pour ce marché';
+            addButton.innerHTML = '<span>📝</span> Faire une collecte';
             addButton.addEventListener('click', () => {
                 showAddProductForm = true;
                 newProductData = { produit_id: '', unite_id: '' };
@@ -925,6 +927,17 @@ export default function CollectesPage() {
         const section = document.createElement('div');
         section.className = 'bg-white rounded-xl shadow-xl p-6';
 
+        // Message d'avertissement si le marché n'a pas de produits mais le formulaire est affiché
+        if (hasNoProducts && showAddProductForm) {
+            const warningDiv = document.createElement('div');
+            warningDiv.className = 'bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4';
+            warningDiv.innerHTML = `
+                <p class="text-yellow-800 font-semibold text-sm">⚠️ Ce marché n'a actuellement aucun produit configuré</p>
+                <p class="text-yellow-600 text-xs mt-1">Le produit que vous allez collecter sera automatiquement ajouté à la liste des produits de ce marché.</p>
+            `;
+            section.appendChild(warningDiv);
+        }
+
         // Header
         const header = document.createElement('h2');
         header.className = 'text-lg font-bold text-gray-800 mb-4 flex items-center';
@@ -932,7 +945,7 @@ export default function CollectesPage() {
         badge.className = 'bg-indigo-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2';
         badge.textContent = '2';
         header.appendChild(badge);
-        header.appendChild(document.createTextNode('Produits suivis dans ce marché'));
+        header.appendChild(document.createTextNode(hasNoProducts ? 'Nouvelle collecte' : 'Produits suivis dans ce marché'));
         section.appendChild(header);
 
         // Table container
@@ -976,7 +989,7 @@ export default function CollectesPage() {
         table.appendChild(thead);
 
         // Filtrer les produits du marché
-        const produitsDuMarche = produits.filter(p =>
+        const produitsDuMarche = hasNoProducts ? [] : produits.filter(p =>
             selectedMarche.produits.some(mp => mp.id_produit === p.id)
         );
 
@@ -989,21 +1002,21 @@ export default function CollectesPage() {
 
         const tbody = document.createElement('tbody');
 
-        if (produitsDuMarche.length === 0) {
+        // Ligne d'ajout de produit EN PREMIER (si activé)
+        if (showAddProductForm) {
+            const addRow = renderAddProductRow();
+            tbody.appendChild(addRow);
+        }
+
+        if (produitsDuMarche.length === 0 && !showAddProductForm) {
             const emptyRow = document.createElement('tr');
             const emptyCell = document.createElement('td');
-            emptyCell.colSpan = 6;
+            emptyCell.colSpan = 7;
             emptyCell.className = 'p-8 text-center text-gray-400 italic';
             emptyCell.textContent = 'Aucun produit trouvé pour ce marché.';
             emptyRow.appendChild(emptyCell);
             tbody.appendChild(emptyRow);
-        } else {
-            // Ligne d'ajout de produit EN PREMIER (si activé)
-            if (showAddProductForm) {
-                const addRow = renderAddProductRow();
-                tbody.appendChild(addRow);
-            }
-
+        } else if (produitsDuMarche.length > 0) {
             // Afficher les produits de la page actuelle
             paginatedProduits.forEach(produit => {
                 const row = renderProductRow(produit);
@@ -1014,7 +1027,8 @@ export default function CollectesPage() {
         table.appendChild(tbody);
         tableContainer.appendChild(table);
 
-        if (produitsDuMarche.length > 0) {
+        // Afficher les contrôles si le marché a des produits OU si on est en mode ajout
+        if (produitsDuMarche.length > 0 || showAddProductForm) {
             // Ajouter les contrôles de pagination et d'ajout de produit
 
             // Info et contrôles en bas du tableau

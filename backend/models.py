@@ -288,10 +288,10 @@ class MarcheBase(BaseModel):
     """Modèle de base pour un marché"""
     nom: str = Field(..., description="Nom du marché")
     nom_creole: Optional[str] = Field(None, description="Nom en créole haïtien")
-    code: str = Field(..., description="Code unique du marché (ex: MAR-000001)")
+    code: Optional[str] = Field(None, description="Code unique du marché (ex: MAR-000001)")
     commune_id: str = Field(..., description="ID de la commune")
     type_marche: Literal["quotidien", "hebdomadaire", "occasionnel"] = Field(
-        ..., description="Type de marché"
+        "quotidien", description="Type de marché"
     )
     latitude: Optional[float] = Field(None, ge=-90, le=90, description="Latitude")
     longitude: Optional[float] = Field(None, ge=-180, le=180, description="Longitude")
