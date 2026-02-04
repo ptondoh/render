@@ -200,6 +200,11 @@ L'application est **prête pour utilisation** :
 4. ✅ Toutes les pages admin accessibles
 5. ✅ CSS Tailwind garanti présent
 
+**Environnements :**
+- 🏠 **Local** : Développement (localhost:3000 + localhost:8000)
+- 🧪 **Test/Staging** : Netlify (frontend) + Render (backend)
+- 🚀 **Production** : À définir (infrastructure différente)
+
 **Plus aucun problème de CSS ou Service Worker ! 💪**
 
 ---

@@ -199,7 +199,9 @@ npm run tailwind:build
 npm test
 ```
 
-### Déploiement
+### Déploiement Test/Staging (Netlify + Render)
+
+**IMPORTANT :** Netlify + Render sont pour les TESTS, pas la production.
 
 ```bash
 # Production build du CSS
@@ -211,8 +213,16 @@ npm run check
 # Commiter tout
 git add .
 git commit -m "..."
-git push
+
+# Push vers branche render pour test/staging
+git push origin render
+git push public render:render  # Pour Netlify
 ```
+
+**Environnements :**
+- 🏠 **Local** : Développement (ce guide)
+- 🧪 **Test/Staging** : Netlify + Render (pour validation avant prod)
+- 🚀 **Production** : Infrastructure séparée (non documenté ici)
 
 ## 📞 Support
 
