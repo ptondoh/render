@@ -193,8 +193,11 @@
     <script type="module" src="/modules/auth.js"></script>
     <script type="module" src="/app.js?v=1738549200"></script>
 
-    <!-- Service Worker Registration -->
+    <!-- Service Worker Registration - DÉSACTIVÉ TEMPORAIREMENT -->
     <script>
+        // Service Worker désactivé pour éviter les problèmes de cache
+        // On le réactivera plus tard avec une meilleure stratégie
+        /*
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js')
@@ -202,20 +205,26 @@
                     .catch(err => console.log('SW registration failed'));
             });
         }
+        */
 
-        // Connection status monitoring
-        window.addEventListener('online', () => {
-            document.getElementById('connection-status').classList.add('hidden');
-        });
-
-        window.addEventListener('offline', () => {
-            document.getElementById('connection-status').classList.remove('hidden');
-        });
-
-        // Check initial connection status
-        if (!navigator.onLine) {
-            document.getElementById('connection-status').classList.remove('hidden');
+        // Désinstaller tout Service Worker existant
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                    console.log('Service Worker désenregistré');
+                }
+            });
         }
+
+        // Cacher définitivement le bandeau "Mode hors-ligne"
+        // (on gérera ça différemment plus tard)
+        document.addEventListener('DOMContentLoaded', () => {
+            const statusBanner = document.getElementById('connection-status');
+            if (statusBanner) {
+                statusBanner.style.display = 'none';
+            }
+        });
     </script>
 </body>
 </html>

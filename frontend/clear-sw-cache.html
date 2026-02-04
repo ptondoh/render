@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nettoyage Cache SAP</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1F4E78;
+            margin-bottom: 20px;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 5px 0;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #007bff; }
+        button {
+            background: #1F4E78;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #2E75B5;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Nettoyage Cache SAP</h1>
+        <p>Ce script va nettoyer complètement le Service Worker et tous les caches pour résoudre le problème "Mode hors-ligne".</p>
+
+        <button id="cleanBtn" onclick="cleanAll()">Lancer le nettoyage</button>
+
+        <div class="log" id="log"></div>
+
+        <button id="reloadBtn" onclick="goToApp()" style="display:none;">Aller à l'application</button>
+    </div>
+
+    <script>
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        async function cleanAll() {
+            const btn = document.getElementById('cleanBtn');
+            btn.disabled = true;
+            btn.textContent = 'Nettoyage en cours...';
+
+            addLog('🔄 Début du nettoyage...', 'info');
+
+            try {
+                // 1. Désinstaller tous les Service Workers
+                addLog('📋 Recherche des Service Workers...', 'info');
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                addLog(`Trouvé ${registrations.length} Service Worker(s)`, 'info');
+
+                for (const registration of registrations) {
+                    const scope = registration.scope;
+                    await registration.unregister();
+                    addLog(`✅ Service Worker désenregistré: ${scope}`, 'success');
+                }
+
+                // 2. Vider tous les caches
+                addLog('📦 Recherche des caches...', 'info');
+                const cacheNames = await caches.keys();
+                addLog(`Trouvé ${cacheNames.length} cache(s): ${cacheNames.join(', ')}`, 'info');
+
+                for (const cacheName of cacheNames) {
+                    await caches.delete(cacheName);
+                    addLog(`🗑️  Cache supprimé: ${cacheName}`, 'success');
+                }
+
+                // 3. Vider le localStorage et sessionStorage
+                addLog('🧹 Nettoyage du localStorage...', 'info');
+                localStorage.clear();
+                addLog('✅ localStorage vidé', 'success');
+
+                addLog('🧹 Nettoyage du sessionStorage...', 'info');
+                sessionStorage.clear();
+                addLog('✅ sessionStorage vidé', 'success');
+
+                // 4. Vider les cookies (optionnel)
+                addLog('🍪 Nettoyage des cookies...', 'info');
+                const cookies = document.cookie.split(';');
+                for (const cookie of cookies) {
+                    const name = cookie.split('=')[0].trim();
+                    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+                }
+                addLog('✅ Cookies vidés', 'success');
+
+                addLog('', 'info');
+                addLog('✨ NETTOYAGE TERMINÉ AVEC SUCCÈS !', 'success');
+                addLog('', 'info');
+                addLog('Vous pouvez maintenant accéder à l\'application.', 'info');
+                addLog('La nouvelle version sera chargée sans cache.', 'info');
+
+                // Afficher le bouton pour aller à l'app
+                document.getElementById('reloadBtn').style.display = 'block';
+                btn.style.display = 'none';
+
+            } catch (error) {
+                addLog(`❌ ERREUR: ${error.message}`, 'error');
+                console.error('Erreur lors du nettoyage:', error);
+                btn.disabled = false;
+                btn.textContent = 'Réessayer';
+            }
+        }
+
+        function goToApp() {
+            addLog('🔄 Redirection vers l\'application...', 'info');
+            setTimeout(() => {
+                window.location.href = 'http://localhost:3000';
+            }, 500);
+        }
+
+        // Message initial
+        addLog('Prêt à nettoyer le cache.', 'info');
+        addLog('Cliquez sur le bouton ci-dessus pour commencer.', 'info');
+    </script>
+</body>
+</html>
