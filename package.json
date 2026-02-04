@@ -4,10 +4,15 @@
   "description": "Système d'Alerte Précoce - Frontend",
   "type": "module",
   "scripts": {
+    "prestart": "npm run tailwind:build",
+    "predev": "npm run tailwind:build",
+    "start": "npm run check && npm run dev",
     "dev": "concurrently \"npm run tailwind:watch\" \"npm run serve\"",
     "tailwind:watch": "tailwindcss -i ./frontend/styles.css -o ./frontend/dist/output.css --watch",
     "tailwind:build": "tailwindcss -i ./frontend/styles.css -o ./frontend/dist/output.css --minify",
     "serve": "python -m http.server 3000 --directory frontend",
+    "check": "node check-setup.js",
+    "setup": "npm install && npm run tailwind:build && npm run check",
     "test": "playwright test",
     "test:ui": "playwright test --ui"
   },

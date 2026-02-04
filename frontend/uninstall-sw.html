@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Désinstallation Service Worker</title>
+    <style>
+        body { font-family: Arial; max-width: 600px; margin: 50px auto; padding: 20px; }
+        h1 { color: #1F4E78; }
+        .message { padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Désinstallation Service Worker</h1>
+    <div id="status" class="message info">Désinstallation en cours...</div>
+
+    <script>
+        (async function() {
+            const status = document.getElementById('status');
+
+            try {
+                // Désinstaller tous les SW
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (let reg of registrations) {
+                    await reg.unregister();
+                }
+
+                // Vider tous les caches
+                const cacheNames = await caches.keys();
+                for (let name of cacheNames) {
+                    await caches.delete(name);
+                }
+
+                status.className = 'message success';
+                status.innerHTML = `
+                    <strong>✅ Désinstallation terminée !</strong><br><br>
+                    - ${registrations.length} Service Worker(s) désinstallé(s)<br>
+                    - ${cacheNames.length} cache(s) supprimé(s)<br><br>
+                    <strong>Rechargement dans 2 secondes...</strong>
+                `;
+
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+
+            } catch (error) {
+                status.className = 'message';
+                status.style.background = '#f8d7da';
+                status.style.color = '#721c24';
+                status.innerHTML = `❌ Erreur: ${error.message}`;
+            }
+        })();
+    </script>
+</body>
+</html>
