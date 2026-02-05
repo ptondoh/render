@@ -1,0 +1,60 @@
+# Backend (ne pas déployer sur Vercel)
+backend/
+*.py
+
+# Tests et scripts
+test_*.py
+test_*.cjs
+test_*.js
+tests/
+*.spec.js
+
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Environnement
+.env
+.env.local
+*.env
+
+# Cache
+__pycache__/
+*.pyc
+.cache/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation dev
+*.md
+!README.md
+
+# Captures et fichiers temporaires
+captures/
+*.png
+*.jpg
+*.jpeg
+nul
+0
+
+# Scripts Python
+*.py
+!backend/**/*.py
+
+# Fichiers Word/Excel temporaires
+*.docx
+*.xlsx
+~$*
