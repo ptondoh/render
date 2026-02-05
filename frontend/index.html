@@ -31,9 +31,12 @@
     <meta name="apple-mobile-web-app-title" content="SAP">
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <!-- Indicateur de connexion -->
-    <div id="connection-status" class="hidden fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-white text-center py-2 text-sm font-medium">
-        <span id="connection-message">Mode hors-ligne - Les données seront synchronisées automatiquement</span>
+    <!-- Indicateur de connexion amélioré -->
+    <div id="connection-status" class="hidden fixed top-0 left-0 right-0 z-50 text-white text-center py-3 text-sm font-medium shadow-lg transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 flex items-center justify-center space-x-2">
+            <span id="connection-icon">📵</span>
+            <span id="connection-message">Mode hors-ligne - Les données seront synchronisées automatiquement</span>
+        </div>
     </div>
 
     <!-- Navigation principale -->
@@ -193,38 +196,240 @@
     <script type="module" src="/modules/auth.js"></script>
     <script type="module" src="/app.js?v=1738549200"></script>
 
-    <!-- Service Worker Registration - DÉSACTIVÉ TEMPORAIREMENT -->
-    <script>
-        // Service Worker désactivé pour éviter les problèmes de cache
-        // On le réactivera plus tard avec une meilleure stratégie
-        /*
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => console.log('SW registered'))
-                    .catch(err => console.log('SW registration failed'));
-            });
-        }
-        */
+    <!-- Service Worker Intelligent + Offline Management -->
+    <script type="module">
+        import { initNetworkDetector } from '/modules/network-detector.js';
+        import { initOfflineManager } from '/modules/offline-manager.js';
+        import { ApiClient } from '/modules/api.js';
 
-        // Désinstaller tout Service Worker existant
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for(let registration of registrations) {
-                    registration.unregister();
-                    console.log('Service Worker désenregistré');
+        // Configuration
+        const API_BASE_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:8000'
+            : window.location.origin;
+
+        let networkDetector = null;
+        let offlineManager = null;
+        let serviceWorkerRegistration = null;
+        let apiClient = null;
+
+        /**
+         * Initialisation au chargement de la page
+         */
+        window.addEventListener('load', async () => {
+            console.log('🚀 Initializing Smart Offline System...');
+
+            try {
+                // 1. Initialiser ApiClient
+                apiClient = new ApiClient(API_BASE_URL);
+
+                // 2. Initialiser OfflineManager
+                offlineManager = await initOfflineManager();
+                console.log('✅ OfflineManager initialized');
+
+                // 3. Initialiser NetworkDetector
+                networkDetector = initNetworkDetector(API_BASE_URL);
+                console.log('✅ NetworkDetector initialized');
+
+                // 4. Enregistrer Service Worker
+                if ('serviceWorker' in navigator) {
+                    try {
+                        serviceWorkerRegistration = await navigator.serviceWorker.register('/sw-smart.js');
+                        console.log('✅ Service Worker registered:', serviceWorkerRegistration.scope);
+
+                        // Écouter les messages du SW
+                        navigator.serviceWorker.addEventListener('message', handleSWMessage);
+
+                        // Mise à jour automatique du SW
+                        serviceWorkerRegistration.addEventListener('updatefound', () => {
+                            const newWorker = serviceWorkerRegistration.installing;
+                            console.log('🔄 New Service Worker found');
+
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'activated') {
+                                    console.log('✅ New Service Worker activated');
+                                }
+                            });
+                        });
+
+                    } catch (error) {
+                        console.error('❌ Service Worker registration failed:', error);
+                    }
                 }
-            });
-        }
 
-        // Cacher définitivement le bandeau "Mode hors-ligne"
-        // (on gérera ça différemment plus tard)
-        document.addEventListener('DOMContentLoaded', () => {
-            const statusBanner = document.getElementById('connection-status');
-            if (statusBanner) {
-                statusBanner.style.display = 'none';
+                // 5. Écouter les changements de connexion
+                networkDetector.onStatusChange(handleNetworkChange);
+
+                // 6. État initial
+                updateUI(networkDetector.getStatus());
+
+                // 7. Afficher le nombre de collectes en attente
+                updatePendingCount();
+
+                // 8. Exposer globalement pour utilisation par d'autres modules et tests
+                window.offlineManager = offlineManager;
+                window.networkDetector = networkDetector;
+                window.syncPendingCollectes = syncPendingCollectes;
+
+                console.log('✅ Global exports ready');
+
+            } catch (error) {
+                console.error('❌ Initialization error:', error);
             }
         });
+
+        /**
+         * Gère les changements de connexion
+         */
+        function handleNetworkChange(isOnline, wasOnline) {
+            console.log(`🌐 Network changed: ${wasOnline ? 'ONLINE' : 'OFFLINE'} → ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
+
+            // Mettre à jour l'UI
+            updateUI(isOnline);
+
+            // Informer le Service Worker
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                    type: 'NETWORK_STATUS',
+                    isOnline: isOnline
+                });
+            }
+
+            // Si on revient online, synchroniser automatiquement
+            if (isOnline && !wasOnline) {
+                console.log('📶 Back online! Starting automatic sync...');
+                setTimeout(() => syncPendingCollectes(), 1000); // Délai de 1s pour stabilité
+            }
+        }
+
+        /**
+         * Met à jour l'interface utilisateur
+         */
+        function updateUI(isOnline) {
+            const statusBanner = document.getElementById('connection-status');
+            const statusMessage = document.getElementById('connection-message');
+
+            if (!statusBanner || !statusMessage) return;
+
+            if (isOnline) {
+                // Mode online
+                statusBanner.classList.add('hidden');
+                statusBanner.classList.remove('bg-yellow-500', 'bg-red-500');
+                statusBanner.classList.add('bg-green-500');
+            } else {
+                // Mode offline
+                statusBanner.classList.remove('hidden', 'bg-green-500');
+                statusBanner.classList.add('bg-yellow-500');
+                statusMessage.textContent = '📵 Mode hors-ligne - Les données seront synchronisées automatiquement';
+            }
+        }
+
+        /**
+         * Affiche le nombre de collectes en attente
+         */
+        async function updatePendingCount() {
+            if (!offlineManager) return;
+
+            try {
+                const count = await offlineManager.getPendingCount();
+                if (count > 0) {
+                    const statusMessage = document.getElementById('connection-message');
+                    if (statusMessage) {
+                        statusMessage.textContent = `📵 Mode hors-ligne - ${count} collecte(s) en attente de synchronisation`;
+                    }
+                }
+            } catch (error) {
+                console.error('Error getting pending count:', error);
+            }
+        }
+
+        /**
+         * Synchronise les collectes en attente
+         */
+        async function syncPendingCollectes() {
+            if (!offlineManager || !apiClient) {
+                console.error('❌ OfflineManager or ApiClient not initialized');
+                return;
+            }
+
+            const statusBanner = document.getElementById('connection-status');
+            const statusMessage = document.getElementById('connection-message');
+
+            try {
+                // Afficher message de sync
+                if (statusBanner && statusMessage) {
+                    statusBanner.classList.remove('hidden', 'bg-yellow-500');
+                    statusBanner.classList.add('bg-blue-500');
+                    statusMessage.textContent = '🔄 Synchronisation en cours...';
+                }
+
+                // Lancer la synchronisation
+                const result = await offlineManager.syncPendingCollectes(apiClient);
+
+                if (result.success) {
+                    if (result.synced > 0) {
+                        // Afficher succès
+                        if (statusBanner && statusMessage) {
+                            statusBanner.classList.remove('bg-blue-500');
+                            statusBanner.classList.add('bg-green-500');
+                            statusMessage.textContent = `✅ ${result.synced} collecte(s) synchronisée(s)`;
+
+                            // Cacher après 3 secondes
+                            setTimeout(() => {
+                                statusBanner.classList.add('hidden');
+                            }, 3000);
+                        }
+
+                        // Notification sonore (optionnel)
+                        console.log('✅ Sync completed successfully');
+                    } else {
+                        // Aucune collecte à synchroniser
+                        if (statusBanner) {
+                            statusBanner.classList.add('hidden');
+                        }
+                    }
+
+                    if (result.failed > 0) {
+                        console.warn(`⚠️  ${result.failed} collecte(s) failed to sync`);
+                    }
+                } else {
+                    throw new Error(result.error || 'Sync failed');
+                }
+
+            } catch (error) {
+                console.error('❌ Sync error:', error);
+
+                // Afficher erreur
+                if (statusBanner && statusMessage) {
+                    statusBanner.classList.remove('bg-blue-500', 'bg-green-500');
+                    statusBanner.classList.add('bg-red-500');
+                    statusMessage.textContent = '❌ Erreur de synchronisation - Réessai automatique plus tard';
+
+                    // Cacher après 5 secondes
+                    setTimeout(() => {
+                        statusBanner.classList.add('hidden');
+                    }, 5000);
+                }
+            }
+        }
+
+        /**
+         * Gère les messages du Service Worker
+         */
+        function handleSWMessage(event) {
+            const { data } = event;
+
+            if (data.type === 'OFFLINE_REQUEST') {
+                console.log('📥 Offline request intercepted by SW:', data.method, data.url);
+                // Le SW a intercepté une requête en mode offline
+                // L'application devra la gérer via OfflineManager
+            }
+
+            if (data.type === 'TRIGGER_SYNC') {
+                console.log('🔄 Background sync triggered:', data.tag);
+                syncPendingCollectes();
+            }
+        }
+
     </script>
 </body>
 </html>
