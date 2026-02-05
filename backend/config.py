@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     app_port: int = 8000
 
     # Configuration CORS
-    cors_origins: str = "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000"
+    cors_origins: str = "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,https://sap-minimaliste.vercel.app,https://*.vercel.app"
 
     # Configuration des Tâches Planifiées
     scheduler_enabled: bool = True
