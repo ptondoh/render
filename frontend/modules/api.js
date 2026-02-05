@@ -180,4 +180,4 @@ const api = new ApiClient(API_BASE_URL);
 
 // Exporter pour utilisation dans d'autres modules
 export default api;
-export { API_BASE_URL };
+export { API_BASE_URL, ApiClient };
