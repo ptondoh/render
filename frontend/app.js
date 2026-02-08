@@ -53,6 +53,22 @@ const routes = {
             return CollectesPage();
         }
     },
+    '/mes-collectes': {
+        title: 'Mes Collectes - SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: MesCollectesPage } = await import('./pages/mes-collectes.js');
+            return MesCollectesPage();
+        }
+    },
+    '/collectes-jour': {
+        title: 'Collectes du Jour - SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: CollectesJourPage } = await import('./pages/collectes-jour.js');
+            return CollectesJourPage();
+        }
+    },
     '/alertes': {
         title: 'Alertes - SAP',
         requireAuth: true,

@@ -104,56 +104,46 @@ export default function DashboardPage() {
         const content = document.createElement('div');
         content.className = 'space-y-6';
 
-        // Statistiques
+        // Statistiques - 3 tuiles cliquables
         const statsGrid = document.createElement('div');
         statsGrid.className = 'grid grid-cols-1 md:grid-cols-3 gap-6';
 
         if (stats) {
+            // Tuile 1: Mes collectes (toutes)
             statsGrid.appendChild(renderStatCard(
                 'Mes collectes',
                 stats.total_collectes || 0,
-                'Total des collectes soumises'
+                'Voir toutes mes collectes',
+                'default',
+                () => window.location.hash = '#/mes-collectes'
             ));
 
-            statsGrid.appendChild(renderStatCard(
-                'Validées',
-                stats.validees || 0,
-                'Collectes validées',
-                'success'
-            ));
+            // Tuile 2: Collectes du jour
+            const today = new Date().toISOString().split('T')[0];
+            const collectesToday = collectes.filter(c => {
+                const collecteDate = new Date(c.date).toISOString().split('T')[0];
+                return collecteDate === today;
+            }).length;
 
             statsGrid.appendChild(renderStatCard(
-                'En attente',
-                stats.en_attente || 0,
-                'Collectes en cours de validation',
-                'warning'
+                'Collectes du jour',
+                collectesToday,
+                'Voir mes collectes d\'aujourd\'hui',
+                'success',
+                () => window.location.hash = '#/collectes-jour'
+            ));
+
+            // Tuile 3: Nouvelle collecte
+            statsGrid.appendChild(renderStatCard(
+                'Nouvelle collecte',
+                '+',
+                'Ajouter une nouvelle collecte',
+                'default',
+                () => window.location.hash = '#/collectes'
             ));
         }
 
         content.appendChild(statsGrid);
-
-        // Bouton nouvelle collecte
-        const actionCard = Card({
-            title: 'Actions rapides',
-            children: [
-                (() => {
-                    const div = document.createElement('div');
-                    div.className = 'text-center py-4';
-
-                    const btn = Button({
-                        text: '+ Nouvelle collecte',
-                        variant: 'primary',
-                        size: 'lg',
-                        onClick: () => window.location.hash = '#/collectes'
-                    });
-
-                    div.appendChild(btn);
-                    return div;
-                })()
-            ]
-        });
-
-        content.appendChild(actionCard);
 
         // Dernières collectes
         if (collectes && collectes.length > 0) {
@@ -323,30 +313,26 @@ export default function DashboardPage() {
     // Rendu d'un item de collecte
     function renderCollecteItem(collecte) {
         const item = document.createElement('div');
-        item.className = 'flex justify-between items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer';
-        item.onclick = () => window.location.hash = '#/collectes';
+        item.className = 'flex justify-between items-center p-4 border border-gray-200 rounded-lg';
 
         const left = document.createElement('div');
         left.className = 'flex-1';
 
         const title = document.createElement('p');
         title.className = 'font-medium text-gray-900';
-        title.textContent = `Produit ${collecte.produit_id}`;
+        title.textContent = `${collecte.produit_nom || 'Produit'} dans ${collecte.marche_nom || 'Marché'}`;
 
         const meta = document.createElement('p');
         meta.className = 'text-sm text-gray-600';
-        meta.textContent = `${formatDate(collecte.date)} - ${collecte.prix} HTG`;
+        const periode = collecte.periode ? ` - ${collecte.periode}` : '';
+        // Utiliser created_at pour l'heure de collecte, sinon date
+        const dateTime = collecte.created_at ? formatDateTime(collecte.created_at) : formatDate(collecte.date);
+        meta.textContent = `${dateTime}${periode} - ${collecte.prix} HTG`;
 
         left.appendChild(title);
         left.appendChild(meta);
 
-        const right = Badge({
-            text: collecte.statut.charAt(0).toUpperCase() + collecte.statut.slice(1),
-            variant: getCollecteStatusVariant(collecte.statut)
-        });
-
         item.appendChild(left);
-        item.appendChild(right);
 
         return item;
     }
@@ -392,6 +378,13 @@ export default function DashboardPage() {
     function formatDate(dateString) {
         const date = new Date(dateString);
         return date.toLocaleDateString('fr-FR');
+    }
+
+    function formatDateTime(dateString) {
+        const date = new Date(dateString);
+        const dateStr = date.toLocaleDateString('fr-FR');
+        const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return `${dateStr} ${timeStr}`;
     }
 
     // Chargement des données
