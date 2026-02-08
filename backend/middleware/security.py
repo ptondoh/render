@@ -73,6 +73,8 @@ async def get_current_user(
         )
 
     # Convertir en modèle Pydantic
+    # Convertir ObjectId en string pour Pydantic
+    user_doc["_id"] = str(user_doc["_id"])
     user = UserInDB(**user_doc)
 
     # Vérifier que l'utilisateur est actif
