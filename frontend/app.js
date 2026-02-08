@@ -272,17 +272,17 @@ class Router {
                 userInitialsEl.textContent = auth.getUserInitials();
             }
 
-            // Afficher/masquer les menus admin selon le rôle
-            const isDecideur = auth.hasRole('décideur');
+            // Afficher/masquer les menus admin selon le rôle (bailleur uniquement)
+            const isBailleur = auth.hasRole('bailleur');
             if (adminMenuDesktop) {
-                if (isDecideur) {
+                if (isBailleur) {
                     adminMenuDesktop.classList.remove('hidden');
                 } else {
                     adminMenuDesktop.classList.add('hidden');
                 }
             }
             if (adminMenuMobile) {
-                if (isDecideur) {
+                if (isBailleur) {
                     adminMenuMobile.classList.remove('hidden');
                 } else {
                     adminMenuMobile.classList.add('hidden');
