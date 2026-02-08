@@ -661,22 +661,26 @@ export default function CollectesPage() {
         mapLabel.appendChild(badge);
         mapLabel.appendChild(document.createTextNode('Carte GPS'));
 
-        const gpsStatus = document.createElement('span');
-        gpsStatus.className = 'text-xs font-bold';
+        // Bouton GPS toggle
+        const gpsButton = document.createElement('button');
+        gpsButton.type = 'button';
 
         if (isFetchingPosition) {
-            gpsStatus.className += ' text-orange-500 animate-pulse';
-            gpsStatus.textContent = 'Recherche GPS...';
+            gpsButton.className = 'px-3 py-1 text-xs font-semibold rounded bg-orange-100 text-orange-600 cursor-not-allowed';
+            gpsButton.textContent = 'Recherche GPS...';
+            gpsButton.disabled = true;
         } else if (userPosition) {
-            gpsStatus.className += ' text-green-600';
-            gpsStatus.textContent = '✓ GPS Obtenu';
+            gpsButton.className = 'px-3 py-1 text-xs font-semibold rounded bg-green-100 text-green-700 hover:bg-green-200 transition';
+            gpsButton.textContent = 'Désactiver GPS';
+            gpsButton.onclick = handleDisableLocation;
         } else {
-            gpsStatus.className += ' text-gray-400';
-            gpsStatus.textContent = 'GPS indisponible';
+            gpsButton.className = 'px-3 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition';
+            gpsButton.textContent = 'Activer GPS';
+            gpsButton.onclick = handleGetLocation;
         }
 
         mapHeader.appendChild(mapLabel);
-        mapHeader.appendChild(gpsStatus);
+        mapHeader.appendChild(gpsButton);
         mapColumn.appendChild(mapHeader);
 
         // Container pour la carte (forcer la hauteur en inline style)
@@ -797,9 +801,7 @@ export default function CollectesPage() {
 
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
-        defaultOption.textContent = userPosition
-            ? '-- Sélectionnez un marché --'
-            : '-- En attente du GPS --';
+        defaultOption.textContent = '-- Sélectionnez un marché --';
         marcheSelect.appendChild(defaultOption);
 
         // Trier les marchés par distance si GPS disponible
@@ -831,7 +833,7 @@ export default function CollectesPage() {
         });
 
         marcheSelect.value = formData.marche_id;
-        marcheSelect.disabled = !userPosition;
+        // Le select est toujours activé, même sans GPS
         marcheSelect.addEventListener('change', async (e) => {
             formData.marche_id = e.target.value;
             currentPage = 1; // Réinitialiser la pagination
@@ -846,7 +848,7 @@ export default function CollectesPage() {
         marcheHint.className = 'text-xs text-gray-500 italic';
         marcheHint.textContent = userPosition
             ? 'Les marchés les plus proches s\'affichent en premier.'
-            : 'Veuillez obtenir votre position GPS pour activer la sélection.';
+            : 'Activez le GPS pour voir les distances et trier par proximité.';
 
         marcheDiv2.appendChild(marcheLabel2);
         marcheDiv2.appendChild(marcheSelect);
@@ -2297,6 +2299,15 @@ export default function CollectesPage() {
                 maximumAge: 0
             }
         );
+    }
+
+    function handleDisableLocation() {
+        userPosition = null;
+        showToast({
+            message: 'GPS désactivé. Les distances ne seront plus affichées.',
+            type: 'info'
+        });
+        render();
     }
 
     // Enregistrer une seule collecte (une période pour un produit)
