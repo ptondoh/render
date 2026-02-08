@@ -853,32 +853,6 @@ export default function CollectesPage() {
         marcheDiv2.appendChild(marcheHint);
         controlsColumn.appendChild(marcheDiv2);
 
-        // LIGNE 2 (en bas) : Date de collecte
-        const dateDiv = document.createElement('div');
-        dateDiv.className = 'space-y-3 w-full';
-        dateDiv.style.width = '100%';
-
-        const dateLabel = document.createElement('label');
-        dateLabel.className = 'block text-sm font-bold text-gray-700';
-        dateLabel.innerHTML = '<span class="text-red-500">*</span> Date de collecte';
-
-        const dateInput = document.createElement('input');
-        dateInput.type = 'date';
-        dateInput.className = 'w-full rounded-lg border-gray-300 p-3 border shadow-sm focus:ring-2 focus:ring-blue-500';
-        dateInput.required = true;
-        dateInput.value = formData.date;
-        dateInput.addEventListener('change', async (e) => {
-            formData.date = e.target.value;
-            if (formData.marche_id) {
-                await loadExistingCollectes();
-                render();
-            }
-        });
-
-        dateDiv.appendChild(dateLabel);
-        dateDiv.appendChild(dateInput);
-        controlsColumn.appendChild(dateDiv);
-
         // Ajouter la colonne contrôles au tableau
         table.appendChild(controlsColumn);
 
@@ -2412,18 +2386,13 @@ export default function CollectesPage() {
     }
 
     async function handleSubmit() {
+        // Capturer la date et l'heure exacte de la collecte
+        formData.date = new Date().toISOString().split('T')[0];
+
         // Validation
         if (!formData.marche_id) {
             showToast({
                 message: 'Veuillez sélectionner un marché',
-                type: 'error'
-            });
-            return;
-        }
-
-        if (!formData.date) {
-            showToast({
-                message: 'Veuillez sélectionner une date',
                 type: 'error'
             });
             return;
