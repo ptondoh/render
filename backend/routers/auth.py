@@ -190,6 +190,8 @@ async def login(credentials: LoginRequest, request: Request):
             detail="Compte désactivé"
         )
 
+    # Convertir ObjectId en string pour Pydantic
+    user_doc["_id"] = str(user_doc["_id"])
     user = UserInDB(**user_doc)
 
     # Si MFA activé, retourner un temp token
@@ -279,6 +281,8 @@ async def verify_mfa(verify_data: MFAVerifyRequest, request: Request):
             detail="Utilisateur non trouvé"
         )
 
+    # Convertir ObjectId en string pour Pydantic
+    user_doc["_id"] = str(user_doc["_id"])
     user = UserInDB(**user_doc)
 
     # Déchiffrer le secret MFA
@@ -389,6 +393,8 @@ async def refresh_token(token_data: RefreshTokenRequest):
             detail="Utilisateur non trouvé"
         )
 
+    # Convertir ObjectId en string pour Pydantic
+    user_doc["_id"] = str(user_doc["_id"])
     user = UserInDB(**user_doc)
 
     if not user.actif:
