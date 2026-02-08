@@ -2277,9 +2277,17 @@ export default function CollectesPage() {
             },
             (error) => {
                 isFetchingPosition = false;
+                let message = 'GPS non disponible';
+                if (error.code === error.PERMISSION_DENIED) {
+                    message = 'GPS refusé. Vous pouvez continuer sans GPS (distances non disponibles)';
+                } else if (error.code === error.POSITION_UNAVAILABLE) {
+                    message = 'Position GPS indisponible. Vous pouvez continuer sans GPS';
+                } else if (error.code === error.TIMEOUT) {
+                    message = 'Délai GPS dépassé. Vous pouvez continuer sans GPS';
+                }
                 showToast({
-                    message: 'Impossible d\'obtenir la position GPS: ' + error.message,
-                    type: 'error'
+                    message: message,
+                    type: 'warning'
                 });
                 render();
             },
@@ -2722,12 +2730,8 @@ export default function CollectesPage() {
     // Charger les données au montage
     loadData();
 
-    // Obtenir automatiquement la position GPS au chargement
-    setTimeout(() => {
-        if (!userPosition && !isFetchingPosition) {
-            handleGetLocation();
-        }
-    }, 500);
+    // Ne pas demander automatiquement le GPS - l'agent clique manuellement si nécessaire
+    // Le GPS est optionnel: utile pour voir les distances, mais pas obligatoire pour travailler
 
     // Rendu initial
     render();
