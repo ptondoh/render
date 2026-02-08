@@ -53,7 +53,7 @@ export default function DashboardPage() {
             case 'décideur':
                 return 'Décideur - Validation et gestion des alertes';
             case 'bailleur':
-                return 'Bailleur - Consultation et analyse des données';
+                return 'Administrateur - Configuration et gestion du système';
             default:
                 return 'Bienvenue sur le Système d\'Alerte Précoce';
         }
@@ -254,58 +254,77 @@ export default function DashboardPage() {
         return content;
     }
 
-    // Dashboard Bailleur
+    // Dashboard Bailleur (Admin)
     function renderBailleurDashboard() {
         const content = document.createElement('div');
         content.className = 'space-y-6';
 
-        // Statistiques globales
-        const statsGrid = document.createElement('div');
-        statsGrid.className = 'grid grid-cols-1 md:grid-cols-4 gap-6';
+        // Titre section
+        const sectionTitle = document.createElement('h2');
+        sectionTitle.className = 'text-xl font-semibold text-gray-900 mb-4';
+        sectionTitle.textContent = 'Configuration du système';
 
-        if (stats) {
-            statsGrid.appendChild(renderStatCard(
-                'Total collectes',
-                stats.total_collectes || 0,
-                'Sur tous les marchés'
-            ));
+        content.appendChild(sectionTitle);
 
-            statsGrid.appendChild(renderStatCard(
-                'Alertes actives',
-                stats.alertes_actives || 0,
-                'Toutes catégories',
-                'warning'
-            ));
+        // Tuiles de configuration - 6 tuiles cliquables
+        const configGrid = document.createElement('div');
+        configGrid.className = 'grid grid-cols-1 md:grid-cols-3 gap-6';
 
-            statsGrid.appendChild(renderStatCard(
-                'Marchés',
-                stats.total_marches || 0,
-                'Dans le système'
-            ));
+        // Tuile 1: Unités de mesure
+        configGrid.appendChild(renderStatCard(
+            'Unités de mesure',
+            '📏',
+            'Gérer les unités de mesure',
+            'default',
+            () => window.location.hash = '#/admin/unites'
+        ));
 
-            statsGrid.appendChild(renderStatCard(
-                'Départements',
-                stats.total_departements || 10,
-                'Couverts'
-            ));
-        }
+        // Tuile 2: Catégories
+        configGrid.appendChild(renderStatCard(
+            'Catégories',
+            '📂',
+            'Gérer les catégories de produits',
+            'default',
+            () => window.location.hash = '#/admin/categories'
+        ));
 
-        content.appendChild(statsGrid);
+        // Tuile 3: Produits
+        configGrid.appendChild(renderStatCard(
+            'Produits',
+            '🛒',
+            'Gérer les produits',
+            'default',
+            () => window.location.hash = '#/admin/produits'
+        ));
 
-        // Vue d'ensemble
-        const overviewCard = Card({
-            title: 'Vue d\'ensemble',
-            children: [
-                (() => {
-                    const div = document.createElement('div');
-                    div.className = 'text-center py-8';
-                    div.innerHTML = '<p class="text-gray-600">Tableaux de bord et analyses détaillées à venir</p>';
-                    return div;
-                })()
-            ]
-        });
+        // Tuile 4: Départements
+        configGrid.appendChild(renderStatCard(
+            'Départements',
+            '🗺️',
+            'Gérer les départements',
+            'default',
+            () => window.location.hash = '#/admin/departements'
+        ));
 
-        content.appendChild(overviewCard);
+        // Tuile 5: Communes
+        configGrid.appendChild(renderStatCard(
+            'Communes',
+            '🏘️',
+            'Gérer les communes',
+            'default',
+            () => window.location.hash = '#/admin/communes'
+        ));
+
+        // Tuile 6: Marchés
+        configGrid.appendChild(renderStatCard(
+            'Marchés',
+            '🏪',
+            'Gérer les marchés',
+            'default',
+            () => window.location.hash = '#/admin/marches'
+        ));
+
+        content.appendChild(configGrid);
 
         return content;
     }
@@ -390,15 +409,16 @@ export default function DashboardPage() {
     // Chargement des données
     async function loadData() {
         try {
-            // Charger les statistiques selon le rôle
-            if (user.role === 'agent') {
+            // Charger les statistiques selon les rôles
+            if (auth.hasRole('agent')) {
                 const statsData = await api.get('/api/collectes/statistiques/resume');
                 stats = statsData;
 
                 const collectesData = await api.get('/api/collectes?limit=10');
                 collectes = collectesData;
+            }
 
-            } else if (user.role === 'décideur') {
+            if (auth.hasRole('décideur')) {
                 const [alertesStats, alertesData] = await Promise.all([
                     api.get('/api/alertes/statistiques/resume'),
                     api.get('/api/alertes?limit=10')
@@ -411,20 +431,10 @@ export default function DashboardPage() {
                 };
 
                 alertes = alertesData;
-
-            } else if (user.role === 'bailleur') {
-                const [collectesStats, alertesStats] = await Promise.all([
-                    api.get('/api/collectes/statistiques/resume'),
-                    api.get('/api/alertes/statistiques/resume')
-                ]);
-
-                stats = {
-                    total_collectes: collectesStats.total_collectes || 0,
-                    alertes_actives: alertesStats.total_alertes_actives || 0,
-                    total_marches: 0, // À implémenter
-                    total_departements: 10
-                };
             }
+
+            // Les bailleurs n'ont pas besoin de charger de statistiques
+            // (leur dashboard affiche uniquement des tuiles de configuration)
 
             isLoading = false;
             render();
@@ -468,24 +478,65 @@ export default function DashboardPage() {
         if (isLoading) {
             container.appendChild(renderLoader());
         } else {
-            let dashboardContent;
+            // Gérer les multi-rôles - afficher tous les dashboards correspondants
+            const dashboards = [];
 
-            switch (user.role) {
-                case 'agent':
-                    dashboardContent = renderAgentDashboard();
-                    break;
-                case 'décideur':
-                    dashboardContent = renderDecideurDashboard();
-                    break;
-                case 'bailleur':
-                    dashboardContent = renderBailleurDashboard();
-                    break;
-                default:
-                    dashboardContent = document.createElement('div');
-                    dashboardContent.innerHTML = '<p class="text-center text-gray-600">Rôle non reconnu</p>';
+            // Vérifier chaque rôle et ajouter le dashboard correspondant
+            if (auth.hasRole('agent')) {
+                dashboards.push({
+                    name: 'Agent',
+                    render: renderAgentDashboard
+                });
             }
 
-            container.appendChild(dashboardContent);
+            if (auth.hasRole('décideur')) {
+                dashboards.push({
+                    name: 'Décideur',
+                    render: renderDecideurDashboard
+                });
+            }
+
+            if (auth.hasRole('bailleur')) {
+                dashboards.push({
+                    name: 'Administration',
+                    render: renderBailleurDashboard
+                });
+            }
+
+            // Si aucun rôle reconnu
+            if (dashboards.length === 0) {
+                const errorDiv = document.createElement('div');
+                errorDiv.innerHTML = '<p class="text-center text-gray-600">Rôle non reconnu</p>';
+                container.appendChild(errorDiv);
+                return;
+            }
+
+            // Afficher tous les dashboards
+            dashboards.forEach((dashboard, index) => {
+                // Ajouter un titre de section si multi-rôles
+                if (dashboards.length > 1) {
+                    const sectionHeader = document.createElement('div');
+                    sectionHeader.className = 'mb-4 pb-2 border-b border-gray-200';
+
+                    const sectionTitle = document.createElement('h2');
+                    sectionTitle.className = 'text-2xl font-bold text-gray-900';
+                    sectionTitle.textContent = `Tableau de bord ${dashboard.name}`;
+
+                    sectionHeader.appendChild(sectionTitle);
+                    container.appendChild(sectionHeader);
+                }
+
+                // Rendre le dashboard
+                const dashboardContent = dashboard.render();
+                container.appendChild(dashboardContent);
+
+                // Ajouter un espaceur entre les dashboards
+                if (index < dashboards.length - 1) {
+                    const spacer = document.createElement('div');
+                    spacer.className = 'h-8';
+                    container.appendChild(spacer);
+                }
+            });
         }
     }
 

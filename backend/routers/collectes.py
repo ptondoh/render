@@ -41,7 +41,7 @@ async def get_collectes(
     query = {}
 
     # Les agents ne voient que leurs collectes
-    if current_user.role == "agent":
+    if "agent" in current_user.roles:
         query["agent_id"] = current_user.id
     elif agent_id:
         query["agent_id"] = agent_id
@@ -133,7 +133,7 @@ async def get_collecte(
         )
 
     # Les agents ne peuvent voir que leurs collectes
-    if current_user.role == "agent" and collecte["agent_id"] != current_user.id:
+    if "agent" in current_user.roles and collecte["agent_id"] != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Accès non autorisé à cette collecte"
@@ -424,7 +424,7 @@ async def update_collecte(
         )
 
     # Vérifier les permissions
-    is_agent = current_user.role == "agent"
+    is_agent = "agent" in current_user.roles
     is_own_collecte = existing["agent_id"] == current_user.id
     is_validated = existing["statut"] in ["validée", "rejetée"]
 
@@ -499,7 +499,7 @@ async def delete_collecte(
         )
 
     # Vérifier les permissions
-    is_agent = current_user.role == "agent"
+    is_agent = "agent" in current_user.roles
     is_own_collecte = existing["agent_id"] == current_user.id
     is_validated = existing["statut"] in ["validée", "rejetée"]
 
@@ -683,7 +683,7 @@ async def get_statistiques_collectes(
     query = {}
 
     # Les agents ne voient que leurs stats
-    if current_user.role == "agent":
+    if "agent" in current_user.roles:
         query["agent_id"] = current_user.id
 
     # Filtre par période
@@ -715,7 +715,7 @@ async def get_statistiques_collectes(
     }
 
     # Stats par agent (décideurs uniquement)
-    if current_user.role in ["décideur", "bailleur"]:
+    if any(role in current_user.roles for role in ["décideur", "bailleur"]):
         pipeline_agent = [
             {"$match": query},
             {"$group": {"_id": "$agent_id", "count": {"$sum": 1}}}

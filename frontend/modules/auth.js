@@ -181,14 +181,14 @@ class AuthManager {
      * Vérifier si l'utilisateur a un rôle spécifique
      */
     hasRole(role) {
-        return this.user && this.user.role === role;
+        return this.user && this.user.roles && this.user.roles.includes(role);
     }
 
     /**
      * Vérifier si l'utilisateur a l'un des rôles spécifiés
      */
     hasAnyRole(roles) {
-        return this.user && roles.includes(this.user.role);
+        return this.user && this.user.roles && roles.some(role => this.user.roles.includes(role));
     }
 
     /**
