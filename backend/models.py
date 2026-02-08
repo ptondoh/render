@@ -43,7 +43,7 @@ class PyObjectId(str):
 class UserBase(BaseModel):
     """Modèle de base pour un utilisateur"""
     email: EmailStr = Field(..., description="Email de l'utilisateur")
-    role: Literal["agent", "décideur", "bailleur"] = Field(..., description="Rôle de l'utilisateur")
+    roles: list[Literal["agent", "décideur", "bailleur"]] = Field(..., description="Rôles de l'utilisateur (peut avoir plusieurs rôles)")
     nom: Optional[str] = Field(None, description="Nom complet")
     prenom: Optional[str] = Field(None, description="Prénom")
     id_categorie_user: Optional[str] = Field(None, description="ID de la catégorie d'utilisateur")

@@ -99,7 +99,7 @@ async def register(user_data: UserCreate, request: Request):
         "_id": str(ObjectId()),
         "email": user_data.email,
         "password_hash": password_hash,
-        "role": user_data.role,
+        "roles": user_data.roles,
         "nom": user_data.nom,
         "departement_id": user_data.departement_id,
         "telephone": user_data.telephone,
@@ -121,7 +121,7 @@ async def register(user_data: UserCreate, request: Request):
         action="user_created",
         resource_type="user",
         resource_id=user_doc["_id"],
-        details={"email": user_data.email, "role": user_data.role},
+        details={"email": user_data.email, "roles": user_data.roles},
         ip_address=ip_address
     )
 
@@ -205,7 +205,7 @@ async def login(credentials: LoginRequest, request: Request):
             user=UserResponse(
                 id=user.id,
                 email=user.email,
-                role=user.role,
+                roles=user.roles,
                 nom=user.nom,
                 departement_id=user.departement_id,
                 telephone=user.telephone,
@@ -219,7 +219,7 @@ async def login(credentials: LoginRequest, request: Request):
 
     # Sinon, générer les tokens normaux
     access_token = auth_service.create_access_token(
-        data={"sub": user.id, "email": user.email, "role": user.role}
+        data={"sub": user.id, "email": user.email, "roles": user.roles}
     )
 
     refresh_token = auth_service.create_refresh_token(
@@ -239,7 +239,7 @@ async def login(credentials: LoginRequest, request: Request):
         user=UserResponse(
             id=user.id,
             email=user.email,
-            role=user.role,
+            roles=user.roles,
             nom=user.nom,
             departement_id=user.departement_id,
             telephone=user.telephone,
@@ -332,7 +332,7 @@ async def verify_mfa(verify_data: MFAVerifyRequest, request: Request):
 
     # Générer les tokens
     access_token = auth_service.create_access_token(
-        data={"sub": user.id, "email": user.email, "role": user.role}
+        data={"sub": user.id, "email": user.email, "roles": user.roles}
     )
 
     refresh_token = auth_service.create_refresh_token(
@@ -352,7 +352,7 @@ async def verify_mfa(verify_data: MFAVerifyRequest, request: Request):
         user=UserResponse(
             id=user.id,
             email=user.email,
-            role=user.role,
+            roles=user.roles,
             nom=user.nom,
             departement_id=user.departement_id,
             telephone=user.telephone,
@@ -399,7 +399,7 @@ async def refresh_token(token_data: RefreshTokenRequest):
 
     # Générer un nouveau access token
     access_token = auth_service.create_access_token(
-        data={"sub": user.id, "email": user.email, "role": user.role}
+        data={"sub": user.id, "email": user.email, "roles": user.roles}
     )
 
     return TokenResponse(

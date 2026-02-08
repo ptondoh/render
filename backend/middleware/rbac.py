@@ -27,18 +27,19 @@ class RoleChecker:
 
     def __call__(self, user: UserInDB = Depends(get_current_user)) -> UserInDB:
         """
-        Vérifier que l'utilisateur a un rôle autorisé.
+        Vérifier que l'utilisateur a au moins un rôle autorisé.
 
         Args:
             user: Utilisateur authentifié
 
         Returns:
-            Utilisateur si le rôle est autorisé
+            Utilisateur si au moins un de ses rôles est autorisé
 
         Raises:
-            HTTPException: Si l'utilisateur n'a pas le bon rôle
+            HTTPException: Si l'utilisateur n'a aucun des rôles requis
         """
-        if user.role not in self.allowed_roles:
+        # Vérifier si l'utilisateur a au moins un des rôles autorisés
+        if not any(role in self.allowed_roles for role in user.roles):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Accès refusé. Rôle requis: {', '.join(self.allowed_roles)}"
@@ -59,12 +60,12 @@ def require_agent(user: UserInDB = Depends(get_current_user)) -> UserInDB:
         user: Utilisateur authentifié
 
     Returns:
-        Utilisateur si rôle agent
+        Utilisateur si a le rôle agent
 
     Raises:
-        HTTPException: Si pas le bon rôle
+        HTTPException: Si n'a pas le rôle agent
     """
-    if user.role != "agent":
+    if "agent" not in user.roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Accès réservé aux agents"
@@ -80,12 +81,12 @@ def require_decideur(user: UserInDB = Depends(get_current_user)) -> UserInDB:
         user: Utilisateur authentifié
 
     Returns:
-        Utilisateur si rôle décideur
+        Utilisateur si a le rôle décideur
 
     Raises:
-        HTTPException: Si pas le bon rôle
+        HTTPException: Si n'a pas le rôle décideur
     """
-    if user.role != "décideur":
+    if "décideur" not in user.roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Accès réservé aux décideurs"
@@ -101,12 +102,12 @@ def require_bailleur(user: UserInDB = Depends(get_current_user)) -> UserInDB:
         user: Utilisateur authentifié
 
     Returns:
-        Utilisateur si rôle bailleur
+        Utilisateur si a le rôle bailleur
 
     Raises:
-        HTTPException: Si pas le bon rôle
+        HTTPException: Si n'a pas le rôle bailleur
     """
-    if user.role != "bailleur":
+    if "bailleur" not in user.roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Accès réservé aux bailleurs"
@@ -125,12 +126,12 @@ def require_decideur_or_bailleur(
         user: Utilisateur authentifié
 
     Returns:
-        Utilisateur si rôle décideur ou bailleur
+        Utilisateur si a le rôle décideur ou bailleur
 
     Raises:
-        HTTPException: Si pas le bon rôle
+        HTTPException: Si n'a aucun de ces rôles
     """
-    if user.role not in ["décideur", "bailleur"]:
+    if not any(role in user.roles for role in ["décideur", "bailleur"]):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Accès réservé aux décideurs et bailleurs"
@@ -153,7 +154,7 @@ def can_create_users(user: UserInDB) -> bool:
     Returns:
         True si l'utilisateur peut créer des utilisateurs
     """
-    return user.role == "décideur"
+    return "décideur" in user.roles
 
 
 def can_validate_collectes(user: UserInDB) -> bool:
@@ -167,7 +168,7 @@ def can_validate_collectes(user: UserInDB) -> bool:
     Returns:
         True si l'utilisateur peut valider des collectes
     """
-    return user.role == "décideur"
+    return "décideur" in user.roles
 
 
 def can_submit_collectes(user: UserInDB) -> bool:
@@ -181,7 +182,7 @@ def can_submit_collectes(user: UserInDB) -> bool:
     Returns:
         True si l'utilisateur peut soumettre des collectes
     """
-    return user.role == "agent"
+    return "agent" in user.roles
 
 
 def can_view_all_data(user: UserInDB) -> bool:
@@ -195,7 +196,7 @@ def can_view_all_data(user: UserInDB) -> bool:
     Returns:
         True si l'utilisateur peut voir toutes les données
     """
-    return user.role in ["décideur", "bailleur"]
+    return any(role in user.roles for role in ["décideur", "bailleur"])
 
 
 def require_role(allowed_roles: List[str]):
