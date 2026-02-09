@@ -190,14 +190,12 @@ async def login(credentials: LoginRequest, request: Request):
             detail="Compte désactivé"
         )
 
-    # Convertir ObjectId en string pour Pydantic
-    user_doc["_id"] = str(user_doc["_id"])
     user = UserInDB(**user_doc)
 
     # Si MFA activé, retourner un temp token
     if user.mfa_enabled:
         temp_token = auth_service.create_access_token(
-            data={"sub": user.id, "type": "mfa_pending"},
+            data={"sub": str(user.id), "type": "mfa_pending"},
             expires_delta=None  # Utilise le délai par défaut
         )
 
@@ -221,11 +219,11 @@ async def login(credentials: LoginRequest, request: Request):
 
     # Sinon, générer les tokens normaux
     access_token = auth_service.create_access_token(
-        data={"sub": user.id, "email": user.email, "roles": user.roles}
+        data={"sub": str(user.id), "email": user.email, "roles": user.roles}
     )
 
     refresh_token = auth_service.create_refresh_token(
-        data={"sub": user.id}
+        data={"sub": str(user.id)}
     )
 
     await log_auth_attempt(
@@ -281,8 +279,6 @@ async def verify_mfa(verify_data: MFAVerifyRequest, request: Request):
             detail="Utilisateur non trouvé"
         )
 
-    # Convertir ObjectId en string pour Pydantic
-    user_doc["_id"] = str(user_doc["_id"])
     user = UserInDB(**user_doc)
 
     # Déchiffrer le secret MFA
@@ -336,11 +332,11 @@ async def verify_mfa(verify_data: MFAVerifyRequest, request: Request):
 
     # Générer les tokens
     access_token = auth_service.create_access_token(
-        data={"sub": user.id, "email": user.email, "roles": user.roles}
+        data={"sub": str(user.id), "email": user.email, "roles": user.roles}
     )
 
     refresh_token = auth_service.create_refresh_token(
-        data={"sub": user.id}
+        data={"sub": str(user.id)}
     )
 
     await log_auth_attempt(
@@ -393,8 +389,6 @@ async def refresh_token(token_data: RefreshTokenRequest):
             detail="Utilisateur non trouvé"
         )
 
-    # Convertir ObjectId en string pour Pydantic
-    user_doc["_id"] = str(user_doc["_id"])
     user = UserInDB(**user_doc)
 
     if not user.actif:
@@ -405,7 +399,7 @@ async def refresh_token(token_data: RefreshTokenRequest):
 
     # Générer un nouveau access token
     access_token = auth_service.create_access_token(
-        data={"sub": user.id, "email": user.email, "roles": user.roles}
+        data={"sub": str(user.id), "email": user.email, "roles": user.roles}
     )
 
     return TokenResponse(

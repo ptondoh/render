@@ -201,6 +201,8 @@
         import { initNetworkDetector } from '/modules/network-detector.js';
         import { initOfflineManager } from '/modules/offline-manager.js';
         import { ApiClient } from '/modules/api.js';
+        import { checkAndHandleVersionUpdate, getAppVersion, logVersionInfo, migrateData } from '/modules/version-manager.js';
+        import { showUpdateNotification } from '/modules/notification.js';
 
         // Configuration
         const API_BASE_URL = window.location.hostname === 'localhost'
@@ -216,6 +218,34 @@
          * Initialisation au chargement de la page
          */
         window.addEventListener('load', async () => {
+            // ÉTAPE 0: Gestion de version (CRITIQUE - doit être en premier)
+            logVersionInfo();
+            const storedVersion = localStorage.getItem('app_version');
+            const cacheCleared = checkAndHandleVersionUpdate();
+
+            if (cacheCleared) {
+                console.warn('⚠️  Cache vidé suite à une mise à jour de version');
+                console.log('ℹ️  Veuillez vous reconnecter si nécessaire');
+
+                // Afficher une notification visuelle
+                showUpdateNotification();
+
+                // Si l'utilisateur était sur une page protégée, le rediriger vers login
+                if (window.location.hash && !window.location.hash.includes('login')) {
+                    // Effectuer la migration des données avant de rediriger
+                    if (storedVersion) {
+                        migrateData(storedVersion);
+                    }
+
+                    // Attendre un peu pour que l'utilisateur voie le message
+                    setTimeout(() => {
+                        window.location.hash = '#/login';
+                        window.location.reload();
+                    }, 2000);
+                    return;
+                }
+            }
+
             console.log('🚀 Initializing Smart Offline System...');
 
             try {

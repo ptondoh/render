@@ -16,6 +16,7 @@ from bson import ObjectId
 class PyObjectId(str):
     """
     Type personnalisé pour gérer les ObjectId MongoDB dans Pydantic.
+    Accepte les ObjectId et les convertit en string pour la sérialisation.
     """
 
     @classmethod
@@ -27,10 +28,15 @@ class PyObjectId(str):
                 core_schema.str_schema(),
                 core_schema.no_info_plain_validator_function(cls.validate),
             ])
-        ])
+        ], serialization=core_schema.plain_serializer_function_ser_schema(
+            lambda x: str(x) if isinstance(x, ObjectId) else x,
+            return_schema=core_schema.str_schema(),
+        ))
 
     @classmethod
     def validate(cls, v):
+        if isinstance(v, ObjectId):
+            return str(v)
         if not ObjectId.is_valid(v):
             raise ValueError("Invalid ObjectId")
         return str(v)
@@ -60,7 +66,7 @@ class UserCreate(UserBase):
 
 class UserInDB(UserBase):
     """Modèle pour un utilisateur en base de données"""
-    id: str = Field(alias="_id")
+    id: PyObjectId = Field(alias="_id")
     password_hash: str
     mfa_secret: Optional[str] = None
     mfa_enabled: bool = False
@@ -75,7 +81,7 @@ class UserInDB(UserBase):
 
 class UserResponse(UserBase):
     """Modèle de réponse pour un utilisateur (sans données sensibles)"""
-    id: str
+    id: PyObjectId
     mfa_enabled: bool
     created_at: datetime
 
