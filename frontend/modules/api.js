@@ -3,6 +3,9 @@
  * Inclut l'authentification automatique et la gestion des erreurs
  */
 
+// Configuration de l'URL du backend
+// En local: http://localhost:8000
+// En production: Backend Render
 const API_BASE_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:8000'
     : 'https://sap-backend-tsjq.onrender.com';

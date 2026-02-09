@@ -48,6 +48,11 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("🚀 Démarrage de l'application SAP...")
+    logger.info(f"🔧 Configuration SAP:")
+    logger.info(f"  Environment: {settings.app_env}")
+    logger.info(f"  Debug: {settings.app_debug}")
+    logger.info(f"  CORS Origins: {settings.cors_origins_list}")
+    logger.info(f"  MongoDB DB: {settings.mongodb_db_name}")
     try:
         await connect_to_mongo()
         logger.info("✅ Application SAP démarrée avec succès")

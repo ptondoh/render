@@ -122,21 +122,21 @@ Access-Control-Allow-Origin: https://parsa-umber.vercel.app
 
 Une fois CORS configuré, tu dois aussi :
 
-### 1. Configurer l'URL du backend dans le frontend Vercel
+### 1. L'URL du backend est déjà configurée
 
-Le frontend doit pointer vers le bon backend. Vérifier dans Vercel :
-
-**Variables d'environnement Vercel :**
-- `VITE_API_URL` = `https://sap-backend-tsjq.onrender.com`
-
-Ou modifier le code du frontend pour détecter automatiquement :
+✅ Le frontend est maintenant configuré pour pointer vers le backend Render en production :
 
 ```javascript
-// frontend/modules/api.js
+// frontend/modules/api.js (déjà configuré)
 const API_BASE_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:8000'
-    : 'https://sap-backend-tsjq.onrender.com';  // URL du backend Render
+    : 'https://sap-backend-tsjq.onrender.com';  // Backend Render
 ```
+
+**Important :** Si vous changez l'URL du backend Render, vous devez :
+1. Modifier cette ligne dans `frontend/modules/api.js`
+2. Mettre à jour la variable `CORS_ORIGINS` sur Render
+3. Redéployer sur Vercel
 
 ### 2. Synchroniser la base de données
 
@@ -165,6 +165,10 @@ python backend/scripts/convert_all_ids_to_objectid.py
 
 ### Erreur persiste après configuration CORS
 
+**⚠️ PROBLÈME RÉSOLU** : L'erreur CORS ne venait pas de Render, mais du frontend qui pointait vers `window.location.origin` au lieu du backend Render. Le fichier `frontend/modules/api.js` a été corrigé pour pointer vers `https://sap-backend-tsjq.onrender.com`.
+
+Si vous rencontrez toujours des erreurs CORS:
+
 1. **Vérifier que le redéploiement est terminé**
    - Aller dans Render > Events
    - Attendre que le statut soit "Live"
@@ -179,6 +183,10 @@ python backend/scripts/convert_all_ids_to_objectid.py
 3. **Vérifier les logs Render**
    - Chercher "CORS Origins" dans les logs
    - Confirmer que l'URL Vercel est présente
+
+4. **Vérifier l'URL du backend dans le frontend**
+   - Ouvrir `frontend/modules/api.js`
+   - Confirmer que `API_BASE_URL` pointe vers `https://sap-backend-tsjq.onrender.com` en production
 
 ### Backend ne démarre pas
 
