@@ -47,28 +47,28 @@ async def seed_users():
             "nom": "Dupont",
             "prenom": "Jean",
             "roles": ["agent"],
-            "password": "Admin@2025"
+            "password": "Test123!"
         },
         {
             "email": "decideur@sap.ht",
             "nom": "Martin",
             "prenom": "Marie",
             "roles": ["decideur"],
-            "password": "Admin@2025"
+            "password": "Test123!"
         },
         {
             "email": "admin@sap.ht",
             "nom": "Administrateur",
             "prenom": "Système",
             "roles": ["bailleur"],
-            "password": "Admin@2025"
+            "password": "Test123!"
         },
         {
             "email": "adminmulti@sap.ht",
             "nom": "Super",
             "prenom": "Admin",
             "roles": ["decideur", "bailleur"],
-            "password": "Admin@2025"
+            "password": "Test123!"
         }
     ]
 
@@ -118,7 +118,7 @@ async def seed_users():
     print("\n✅ Tous les utilisateurs sont prêts!")
     print("\n🔑 Credentials:")
     print("  Emails: agent@sap.ht, decideur@sap.ht, admin@sap.ht, adminmulti@sap.ht")
-    print("  Mot de passe: Admin@2025")
+    print("  Mot de passe: Test123!")
 
     client.close()
 
