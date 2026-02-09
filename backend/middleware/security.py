@@ -63,7 +63,9 @@ async def get_current_user(
 
     # Récupérer l'utilisateur de la base de données
     users_collection = get_collection("users")
-    user_doc = await users_collection.find_one({"_id": user_id})
+    # Convertir user_id (string) en ObjectId pour la recherche MongoDB
+    from bson import ObjectId
+    user_doc = await users_collection.find_one({"_id": ObjectId(user_id)})
 
     if user_doc is None:
         raise HTTPException(
@@ -73,8 +75,6 @@ async def get_current_user(
         )
 
     # Convertir en modèle Pydantic
-    # Convertir ObjectId en string pour Pydantic
-    user_doc["_id"] = str(user_doc["_id"])
     user = UserInDB(**user_doc)
 
     # Vérifier que l'utilisateur est actif
