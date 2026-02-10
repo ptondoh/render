@@ -597,6 +597,9 @@ export default function AdminProduitsPage() {
             );
         }
 
+        // Tri alphabétique par nom
+        filtered.sort((a, b) => a.nom.localeCompare(b.nom));
+
         filteredProduits = filtered;
     }
 
