@@ -8,7 +8,7 @@
 // En production: Backend Render
 const API_BASE_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:8000'
-    : 'https://sap-backend-tsjq.onrender.com';
+    : 'https://sap-backend-ts3g.onrender.com';
 
 /**
  * Classe pour gérer les appels API
