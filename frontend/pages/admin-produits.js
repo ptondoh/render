@@ -11,14 +11,14 @@ export default function AdminProduitsPage() {
     const container = document.createElement('div');
     container.className = 'space-y-6';
 
-    const isDecideur = auth.hasRole('décideur');
+    const isBailleur = auth.hasRole('bailleur');
 
-    if (!isDecideur) {
+    if (!isBailleur) {
         const unauthorized = document.createElement('div');
         unauthorized.className = 'text-center py-12';
         unauthorized.innerHTML = `
             <h2 class="text-2xl font-bold text-red-600 mb-2">Accès non autorisé</h2>
-            <p class="text-gray-600">Cette page est réservée aux décideurs.</p>
+            <p class="text-gray-600">Cette page est réservée aux administrateurs.</p>
         `;
         container.appendChild(unauthorized);
         return container;

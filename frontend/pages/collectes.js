@@ -16,6 +16,7 @@ export default function CollectesPage() {
     const user = auth.getCurrentUser();
     const isAgent = auth.hasRole('agent');
     const isDecideur = auth.hasRole('décideur');
+    const isBailleur = auth.hasRole('bailleur');
 
     // ========================================
     // VUE DE CONSULTATION POUR LES DÉCIDEURS
@@ -578,8 +579,9 @@ export default function CollectesPage() {
         return consultationContainer;
     }
 
-    // Si décideur, afficher la vue de consultation
-    if (isDecideur) {
+    // Si décideur OU bailleur (admin), afficher la vue de consultation
+    // Les bailleurs consultent les collectes mais n'en créent pas
+    if (isDecideur || isBailleur) {
         return renderConsultationView();
     }
 
