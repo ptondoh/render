@@ -103,16 +103,22 @@ export default function AdminDepartementsPage() {
 
     // Filtrer les départements
     function filterDepartements() {
+        let filtered;
         if (!searchTerm) {
-            filteredDepartements = departements;
+            filtered = departements;
         } else {
             const term = searchTerm.toLowerCase();
-            filteredDepartements = departements.filter(dept =>
+            filtered = departements.filter(dept =>
                 dept.nom.toLowerCase().includes(term) ||
                 dept.code.toLowerCase().includes(term) ||
                 (dept.nom_creole && dept.nom_creole.toLowerCase().includes(term))
             );
         }
+
+        // Tri alphabétique par nom
+        filtered.sort((a, b) => a.nom.localeCompare(b.nom));
+
+        filteredDepartements = filtered;
         totalPages = Math.ceil(filteredDepartements.length / itemsPerPage);
     }
 

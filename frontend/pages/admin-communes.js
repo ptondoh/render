@@ -159,6 +159,9 @@ export default function AdminCommunesPage() {
             );
         }
 
+        // Tri alphabétique par nom
+        filtered.sort((a, b) => a.nom.localeCompare(b.nom));
+
         filteredCommunes = filtered;
         totalPages = Math.ceil(filteredCommunes.length / itemsPerPage);
     }

@@ -473,16 +473,22 @@ export default function AdminCategoriesPage() {
     }
 
     function filterCategories() {
+        let filtered;
         if (!searchTerm.trim()) {
-            filteredCategories = [...categories];
+            filtered = [...categories];
         } else {
             const term = searchTerm.toLowerCase();
-            filteredCategories = categories.filter(cat =>
+            filtered = categories.filter(cat =>
                 cat.nom.toLowerCase().includes(term) ||
                 (cat.nom_creole && cat.nom_creole.toLowerCase().includes(term)) ||
                 (cat.description && cat.description.toLowerCase().includes(term))
             );
         }
+
+        // Tri alphabétique par nom
+        filtered.sort((a, b) => a.nom.localeCompare(b.nom));
+
+        filteredCategories = filtered;
 
         // Calculer le nombre de pages
         totalPages = Math.max(1, Math.ceil(filteredCategories.length / itemsPerPage));

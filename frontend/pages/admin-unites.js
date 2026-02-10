@@ -453,15 +453,21 @@ export default function AdminUnitesPage() {
     }
 
     function filterUnites() {
+        let filtered;
         if (!searchTerm.trim()) {
-            filteredUnites = [...unites];
+            filtered = [...unites];
         } else {
             const term = searchTerm.toLowerCase();
-            filteredUnites = unites.filter(unite =>
+            filtered = unites.filter(unite =>
                 unite.unite.toLowerCase().includes(term) ||
                 (unite.symbole && unite.symbole.toLowerCase().includes(term))
             );
         }
+
+        // Tri alphabétique par nom d'unité
+        filtered.sort((a, b) => a.unite.localeCompare(b.unite));
+
+        filteredUnites = filtered;
 
         // Calculer le nombre de pages
         totalPages = Math.max(1, Math.ceil(filteredUnites.length / itemsPerPage));

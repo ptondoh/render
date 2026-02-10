@@ -726,11 +726,12 @@ export default function AdminMarchesPage() {
     }
 
     function filterMarches() {
+        let filtered;
         if (!searchTerm.trim()) {
-            filteredMarches = [...marches];
+            filtered = [...marches];
         } else {
             const term = searchTerm.toLowerCase();
-            filteredMarches = marches.filter(marche =>
+            filtered = marches.filter(marche =>
                 marche.nom.toLowerCase().includes(term) ||
                 marche.code.toLowerCase().includes(term) ||
                 (marche.nom_creole && marche.nom_creole.toLowerCase().includes(term)) ||
@@ -738,6 +739,11 @@ export default function AdminMarchesPage() {
                 (marche.departement_nom && marche.departement_nom.toLowerCase().includes(term))
             );
         }
+
+        // Tri alphabétique par nom
+        filtered.sort((a, b) => a.nom.localeCompare(b.nom));
+
+        filteredMarches = filtered;
 
         // Calculer le nombre de pages
         totalPages = Math.max(1, Math.ceil(filteredMarches.length / itemsPerPage));
