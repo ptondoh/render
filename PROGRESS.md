@@ -1,6 +1,6 @@
 # 📊 PROGRESS.md - Avancement du Projet SAP
 
-> **Dernière mise à jour :** 2026-02-09
+> **Dernière mise à jour :** 2026-02-10
 > **Version :** 0.1
 > **Branche principale :** refactor-stack-minimaliste
 
@@ -55,6 +55,11 @@ Le **Système d'Alerte Précoce (SAP)** pour la sécurité alimentaire en Haïti
 
 #### Vue CONSULTATION (Décideurs & Bailleurs)
 - Tableau complet des collectes
+- **Tri interactif sur toutes les colonnes** ✨ NEW
+  - Colonnes cliquables avec indicateurs visuels (↑↓)
+  - Toggle croissant/décroissant par clic
+  - 7 colonnes triables : Date, Période, Marché, Produit, Prix, Quantité, Agent
+  - Tri par défaut : date la plus récente d'abord
 - Filtres par :
   - Agent
   - Marché
@@ -77,33 +82,46 @@ Le **Système d'Alerte Précoce (SAP)** pour la sécurité alimentaire en Haïti
 
 Accessibles uniquement aux utilisateurs avec le rôle **bailleur**.
 
+#### Fonctionnalités communes
+- **Tri interactif** sur toutes les colonnes pertinentes ✨ NEW
+- **Recherche en temps réel** avec focus maintenu ✨ NEW
+- Pagination configurable
+- Export des données
+- Formulaires de création/modification
+
 #### Pages disponibles
 1. **Produits** (`/admin/produits`)
    - Gestion des produits alimentaires
    - Catégories associées
    - Unités de mesure
+   - Tri : Code, Nom, Catégorie, Unité
 
 2. **Catégories** (`/admin/categories`)
    - Catégories de produits
    - Hiérarchie et organisation
+   - Tri : Nom, Nom Créole
 
 3. **Unités de mesure** (`/admin/unites`)
    - Types d'unités (kg, lb, marmite, etc.)
    - Facteurs de conversion
+   - Tri : Unité, Symbole
 
 4. **Marchés** (`/admin/marches`)
    - Informations géographiques (lat/lng)
    - Commune associée
    - Statut (actif/inactif)
+   - Tri : Code, Nom, Commune, Type
 
 5. **Communes** (`/admin/communes`)
    - Liste des communes
    - Département associé
    - Géolocalisation
+   - Tri : Code, Nom, Département, Population, Marchés
 
 6. **Départements** (`/admin/departements`)
    - 10 départements d'Haïti
    - Gestion centralisée
+   - Tri : Code, Nom, Communes
 
 #### Sécurité RBAC
 - Vérification du rôle `bailleur` sur chaque page
@@ -117,6 +135,11 @@ Accessibles uniquement aux utilisateurs avec le rôle **bailleur**.
 #### Fonctionnalités
 - Création d'alertes de sécurité alimentaire
 - Niveaux d'alerte (1-5)
+- **Tri interactif sur toutes les colonnes** ✨ NEW
+  - Colonnes cliquables avec indicateurs visuels (↑↓)
+  - Toggle croissant/décroissant par clic
+  - 6 colonnes triables : Date, Produit, Marché, Niveau, Variation, Prix
+  - Tri par défaut : date la plus récente d'abord
 - Filtrage par région, niveau, date
 - Notifications en temps réel
 - Export des alertes
@@ -257,6 +280,52 @@ if (isDecideur || isBailleur) {
 
 ---
 
+### Bug #4 : Focus Perdu dans les Champs de Recherche ✅
+**Date :** 2026-02-10
+**Symptôme :** Le focus était perdu après chaque caractère tapé dans les champs de recherche
+
+**Cause :**
+```javascript
+// AVANT (problématique)
+searchInput.addEventListener('input', (e) => {
+    searchTerm = e.target.value;
+    filterXXX();
+    render();  // Recrée tout le DOM y compris le champ de recherche
+});
+// Résultat : L'utilisateur ne pouvait pas taper plusieurs caractères d'affilée
+```
+
+**Solution :**
+```javascript
+// APRÈS (correct)
+searchInput.addEventListener('input', (e) => {
+    const inputElement = e.target;
+    const cursorPosition = inputElement.selectionStart;
+    searchTerm = inputElement.value;
+    filterXXX();
+    render();
+
+    // Restaurer le focus et la position du curseur
+    requestAnimationFrame(() => {
+        const newSearchInput = container.querySelector('input[type="text"][placeholder*="Rechercher"]');
+        if (newSearchInput) {
+            newSearchInput.focus();
+            newSearchInput.setSelectionRange(cursorPosition, cursorPosition);
+        }
+    });
+});
+```
+
+**Fichiers modifiés :**
+- `frontend/pages/admin-produits.js`
+- `frontend/pages/admin-categories.js`
+- `frontend/pages/admin-unites.js`
+- `frontend/pages/admin-marches.js`
+- `frontend/pages/admin-communes.js`
+- `frontend/pages/admin-departements.js`
+
+---
+
 ## 🧪 Tests Effectués
 
 ### Tests Playwright (100% réussite)
@@ -283,7 +352,33 @@ if (isDecideur || isBailleur) {
 | admin@sap.ht | bailleur | CONSULTATION | ✅ OK |
 | adminmulti@sap.ht | décideur + bailleur | CONSULTATION | ✅ OK |
 
-**Taux de réussite global : 100% (12/12 tests passés)**
+#### Test 4 : Tri interactif pages admin ✅
+```
+✅ admin-produits → 4 colonnes triables (Code, Nom, Catégorie, Unité)
+✅ admin-categories → 2 colonnes triables (Nom, Nom Créole)
+✅ admin-unites → 2 colonnes triables (Unité, Symbole)
+✅ admin-marches → 4 colonnes triables (Code, Nom, Commune, Type)
+✅ admin-communes → 5 colonnes triables (Code, Nom, Département, Population, Marchés)
+✅ admin-departements → 3 colonnes triables (Code, Nom, Communes)
+```
+
+#### Test 5 : Tri interactif pages consultation ✅
+```
+✅ collectes → 7 colonnes triables (Date, Période, Marché, Produit, Prix, Quantité, Agent)
+✅ alertes → 6 colonnes triables (Date, Produit, Marché, Niveau, Variation, Prix)
+```
+
+#### Test 6 : Focus maintenu dans recherche ✅
+```
+✅ admin-produits → Saisie complète sans perte de focus
+✅ admin-categories → Saisie complète sans perte de focus
+✅ admin-unites → Saisie complète sans perte de focus
+✅ admin-marches → Saisie complète sans perte de focus
+✅ admin-communes → Saisie complète sans perte de focus
+✅ admin-departements → Saisie complète sans perte de focus
+```
+
+**Taux de réussite global : 100% (26/26 tests passés)**
 
 ---
 
@@ -417,9 +512,33 @@ mongod --dbpath C:\data\db
 
 ---
 
-## 🔄 Dernières Modifications (2026-02-09)
+## 🔄 Dernières Modifications
 
-### Commit : `f8e48de`
+### Commit : `32c78c8` (2026-02-10)
+```
+feat: Ajouter tri interactif et corriger focus dans les recherches
+
+NOUVELLES FONCTIONNALITÉS:
+- Tri interactif sur pages de consultation (collectes et alertes)
+  * Colonnes cliquables avec indicateurs visuels (↑↓)
+  * Toggle croissant/décroissant par clic
+  * 7 colonnes triables pour collectes
+  * 6 colonnes triables pour alertes
+  * Tri par défaut: date la plus récente d'abord
+
+- Tri interactif sur toutes les pages admin
+  * 6 pages avec tri alphabétique/numérique
+  * Indicateurs visuels (↑↓)
+
+CORRECTIONS:
+- Focus maintenu dans les champs de recherche lors de la saisie
+  * Restauration automatique du focus et position du curseur
+  * 6 pages admin corrigées
+
+Tests Playwright: 100% réussite (26/26 tests passés)
+```
+
+### Commit : `f8e48de` (2026-02-09)
 ```
 fix: Corriger permissions et vues selon les rôles utilisateurs
 
