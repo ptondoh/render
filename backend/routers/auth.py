@@ -271,7 +271,8 @@ async def verify_mfa(verify_data: MFAVerifyRequest, request: Request):
 
     # Récupérer l'utilisateur
     users_collection = get_collection("users")
-    user_doc = await users_collection.find_one({"_id": user_id})
+    # Convertir user_id (string du JWT) en ObjectId pour la requête MongoDB
+    user_doc = await users_collection.find_one({"_id": ObjectId(user_id)})
 
     if not user_doc:
         raise HTTPException(
@@ -381,7 +382,8 @@ async def refresh_token(token_data: RefreshTokenRequest):
 
     # Vérifier que l'utilisateur existe toujours
     users_collection = get_collection("users")
-    user_doc = await users_collection.find_one({"_id": user_id})
+    # Convertir user_id (string du JWT) en ObjectId pour la requête MongoDB
+    user_doc = await users_collection.find_one({"_id": ObjectId(user_id)})
 
     if not user_doc:
         raise HTTPException(
@@ -490,7 +492,8 @@ async def verify_mfa_setup(
     users_collection = get_collection("users")
 
     # Récupérer le secret stocké
-    user_doc = await users_collection.find_one({"_id": current_user.id})
+    # Convertir current_user.id (string/PyObjectId) en ObjectId pour la requête MongoDB
+    user_doc = await users_collection.find_one({"_id": ObjectId(current_user.id)})
 
     if not user_doc or not user_doc.get("mfa_secret"):
         raise HTTPException(
