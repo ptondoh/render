@@ -42,7 +42,8 @@ async def get_collectes(
 
     # Les agents ne voient que leurs collectes
     if "agent" in current_user.roles:
-        query["agent_id"] = current_user.id
+        # FIX: Convertir ObjectId en string pour correspondre aux agent_id stockés
+        query["agent_id"] = str(current_user.id)
     elif agent_id:
         query["agent_id"] = agent_id
 
@@ -684,7 +685,8 @@ async def get_statistiques_collectes(
 
     # Les agents ne voient que leurs stats
     if "agent" in current_user.roles:
-        query["agent_id"] = current_user.id
+        # FIX: Convertir ObjectId en string pour correspondre aux agent_id stockés
+        query["agent_id"] = str(current_user.id)
 
     # Filtre par période
     if date_debut or date_fin:
