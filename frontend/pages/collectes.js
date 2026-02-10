@@ -47,6 +47,10 @@ export default function CollectesPage() {
         let itemsPerPage = 20;
         let totalPages = 1;
 
+        // Tri (par défaut: date la plus récente d'abord)
+        let sortColumn = 'date';
+        let sortDirection = 'desc';
+
         // Header
         const header = document.createElement('div');
         header.className = 'bg-white p-6 rounded-lg shadow-md';
@@ -269,20 +273,40 @@ export default function CollectesPage() {
             const table = document.createElement('table');
             table.className = 'min-w-full divide-y divide-gray-200';
 
-            // Header
-            table.innerHTML = `
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Période</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marché</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produit</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantité</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Agent</th>
-                    </tr>
-                </thead>
-            `;
+            // Header avec tri interactif
+            const thead = document.createElement('thead');
+            thead.className = 'bg-gray-50';
+            const headerRow = document.createElement('tr');
+
+            const createSortableHeader = (text, column) => {
+                const th = document.createElement('th');
+                th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none';
+                th.onclick = () => handleSort(column);
+                const content = document.createElement('div');
+                content.className = 'flex items-center gap-1';
+                const textSpan = document.createElement('span');
+                textSpan.textContent = text;
+                content.appendChild(textSpan);
+                if (sortColumn === column) {
+                    const arrow = document.createElement('span');
+                    arrow.textContent = sortDirection === 'asc' ? '↑' : '↓';
+                    arrow.className = 'text-blue-600 font-bold';
+                    content.appendChild(arrow);
+                }
+                th.appendChild(content);
+                return th;
+            };
+
+            headerRow.appendChild(createSortableHeader('Date', 'date'));
+            headerRow.appendChild(createSortableHeader('Période', 'periode'));
+            headerRow.appendChild(createSortableHeader('Marché', 'marche'));
+            headerRow.appendChild(createSortableHeader('Produit', 'produit'));
+            headerRow.appendChild(createSortableHeader('Prix', 'prix'));
+            headerRow.appendChild(createSortableHeader('Quantité', 'quantite'));
+            headerRow.appendChild(createSortableHeader('Agent', 'agent'));
+
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
 
             const tbody = document.createElement('tbody');
             tbody.className = 'bg-white divide-y divide-gray-200';
@@ -480,7 +504,69 @@ export default function CollectesPage() {
                 return true;
             });
 
+            // Tri dynamique
+            filteredCollectes.sort((a, b) => {
+                let aVal, bVal;
+
+                switch(sortColumn) {
+                    case 'date':
+                        aVal = new Date(a.date).getTime();
+                        bVal = new Date(b.date).getTime();
+                        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+                    case 'periode':
+                        const periodeOrder = { 'matin1': 1, 'matin2': 2, 'soir1': 3, 'soir2': 4 };
+                        aVal = periodeOrder[a.periode] || 0;
+                        bVal = periodeOrder[b.periode] || 0;
+                        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+                    case 'marche':
+                        aVal = a.marche_nom || '';
+                        bVal = b.marche_nom || '';
+                        break;
+                    case 'produit':
+                        aVal = a.produit_nom || '';
+                        bVal = b.produit_nom || '';
+                        break;
+                    case 'prix':
+                        aVal = parseFloat(a.prix) || 0;
+                        bVal = parseFloat(b.prix) || 0;
+                        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+                    case 'quantite':
+                        aVal = parseFloat(a.quantite) || 0;
+                        bVal = parseFloat(b.quantite) || 0;
+                        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+                    case 'agent':
+                        aVal = a.agent_nom || '';
+                        bVal = b.agent_nom || '';
+                        break;
+                    default:
+                        // Par défaut, tri par date décroissant
+                        aVal = new Date(a.date).getTime();
+                        bVal = new Date(b.date).getTime();
+                        return bVal - aVal;
+                }
+
+                // Pour les chaînes de caractères
+                if (typeof aVal === 'string') {
+                    const comparison = aVal.toString().localeCompare(bVal.toString());
+                    return sortDirection === 'asc' ? comparison : -comparison;
+                }
+
+                return 0;
+            });
+
             totalPages = Math.ceil(filteredCollectes.length / itemsPerPage);
+        }
+
+        // Gérer le tri des colonnes
+        function handleSort(column) {
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'asc';
+            }
+            applyFilters();
+            updateTable();
         }
 
         // Mettre à jour le tableau

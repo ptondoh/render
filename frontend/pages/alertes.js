@@ -61,6 +61,10 @@ export default function AlertesPage() {
     let itemsPerPage = 10;
     let totalPages = 1;
 
+    // Tri (par défaut: date la plus récente d'abord)
+    let sortColumn = 'date';
+    let sortDirection = 'desc';
+
     // Modal détails
     let showDetailsModal = false;
     let selectedAlerte = null;
@@ -459,20 +463,44 @@ export default function AlertesPage() {
         const table = document.createElement('table');
         table.className = 'min-w-full divide-y divide-gray-200';
 
-        // En-tête
+        // En-tête avec tri interactif
         const thead = document.createElement('thead');
         thead.className = 'bg-gray-50';
-        thead.innerHTML = `
-            <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produit</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marché</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Niveau</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Variation</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prix</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-        `;
+        const headerRow = document.createElement('tr');
+
+        const createSortableHeader = (text, column) => {
+            const th = document.createElement('th');
+            th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none';
+            th.onclick = () => handleSort(column);
+            const content = document.createElement('div');
+            content.className = 'flex items-center gap-1';
+            const textSpan = document.createElement('span');
+            textSpan.textContent = text;
+            content.appendChild(textSpan);
+            if (sortColumn === column) {
+                const arrow = document.createElement('span');
+                arrow.textContent = sortDirection === 'asc' ? '↑' : '↓';
+                arrow.className = 'text-blue-600 font-bold';
+                content.appendChild(arrow);
+            }
+            th.appendChild(content);
+            return th;
+        };
+
+        headerRow.appendChild(createSortableHeader('Date', 'date'));
+        headerRow.appendChild(createSortableHeader('Produit', 'produit'));
+        headerRow.appendChild(createSortableHeader('Marché', 'marche'));
+        headerRow.appendChild(createSortableHeader('Niveau', 'niveau'));
+        headerRow.appendChild(createSortableHeader('Variation', 'variation'));
+        headerRow.appendChild(createSortableHeader('Prix', 'prix'));
+
+        // Colonne Actions (non triable)
+        const actionsHeader = document.createElement('th');
+        actionsHeader.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+        actionsHeader.textContent = 'Actions';
+        headerRow.appendChild(actionsHeader);
+
+        thead.appendChild(headerRow);
         table.appendChild(thead);
 
         // Corps
@@ -761,7 +789,65 @@ export default function AlertesPage() {
             return true;
         });
 
+        // Tri dynamique
+        filteredAlertes.sort((a, b) => {
+            let aVal, bVal;
+
+            switch(sortColumn) {
+                case 'date':
+                    aVal = new Date(a.created_at).getTime();
+                    bVal = new Date(b.created_at).getTime();
+                    return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+                case 'produit':
+                    aVal = a.produit_nom || '';
+                    bVal = b.produit_nom || '';
+                    break;
+                case 'marche':
+                    aVal = a.marche_nom || '';
+                    bVal = b.marche_nom || '';
+                    break;
+                case 'niveau':
+                    const niveauOrder = { 'surveillance': 1, 'alerte': 2, 'urgence': 3 };
+                    aVal = niveauOrder[a.niveau] || 0;
+                    bVal = niveauOrder[b.niveau] || 0;
+                    return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+                case 'variation':
+                    aVal = parseFloat(a.ecart_pourcentage) || 0;
+                    bVal = parseFloat(b.ecart_pourcentage) || 0;
+                    return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+                case 'prix':
+                    aVal = parseFloat(a.prix_actuel) || 0;
+                    bVal = parseFloat(b.prix_actuel) || 0;
+                    return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+                default:
+                    // Par défaut, tri par date décroissant
+                    aVal = new Date(a.created_at).getTime();
+                    bVal = new Date(b.created_at).getTime();
+                    return bVal - aVal;
+            }
+
+            // Pour les chaînes de caractères
+            if (typeof aVal === 'string') {
+                const comparison = aVal.toString().localeCompare(bVal.toString());
+                return sortDirection === 'asc' ? comparison : -comparison;
+            }
+
+            return 0;
+        });
+
         totalPages = Math.ceil(filteredAlertes.length / itemsPerPage);
+    }
+
+    // Gérer le tri des colonnes
+    function handleSort(column) {
+        if (sortColumn === column) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortColumn = column;
+            sortDirection = 'asc';
+        }
+        filterAlertes();
+        render();
     }
 
     // Actions

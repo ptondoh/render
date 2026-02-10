@@ -34,6 +34,10 @@ export default function AdminUnitesPage() {
     let editingUnite = null;
     let showModal = false;
 
+    // Tri
+    let sortColumn = 'unite';
+    let sortDirection = 'asc';
+
     // Pagination
     let currentPage = 1;
     let itemsPerPage = 10;
@@ -90,10 +94,21 @@ export default function AdminUnitesPage() {
         searchInput.className = 'w-full md:w-96 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500';
         searchInput.value = searchTerm;
         searchInput.addEventListener('input', (e) => {
-            searchTerm = e.target.value;
+            const inputElement = e.target;
+            const cursorPosition = inputElement.selectionStart;
+            searchTerm = inputElement.value;
             currentPage = 1; // Reset to first page
             filterUnites();
             render();
+
+            // Restaurer le focus et la position du curseur
+            requestAnimationFrame(() => {
+                const newSearchInput = container.querySelector('input[type="text"][placeholder*="Rechercher"]');
+                if (newSearchInput) {
+                    newSearchInput.focus();
+                    newSearchInput.setSelectionRange(cursorPosition, cursorPosition);
+                }
+            });
         });
 
         searchBar.appendChild(searchInput);
@@ -215,16 +230,39 @@ export default function AdminUnitesPage() {
                     const table = document.createElement('table');
                     table.className = 'min-w-full divide-y divide-gray-200';
 
-                    // Header
+                    // Header avec tri
                     const thead = document.createElement('thead');
                     thead.className = 'bg-gray-50';
-                    thead.innerHTML = `
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unité</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Symbole</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    `;
+                    const headerRow = document.createElement('tr');
+
+                    const createSortableHeader = (text, column) => {
+                        const th = document.createElement('th');
+                        th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none';
+                        th.onclick = () => handleSort(column);
+                        const content = document.createElement('div');
+                        content.className = 'flex items-center gap-1';
+                        const textSpan = document.createElement('span');
+                        textSpan.textContent = text;
+                        content.appendChild(textSpan);
+                        if (sortColumn === column) {
+                            const arrow = document.createElement('span');
+                            arrow.textContent = sortDirection === 'asc' ? '↑' : '↓';
+                            arrow.className = 'text-blue-600 font-bold';
+                            content.appendChild(arrow);
+                        }
+                        th.appendChild(content);
+                        return th;
+                    };
+
+                    headerRow.appendChild(createSortableHeader('Unité', 'unite'));
+                    headerRow.appendChild(createSortableHeader('Symbole', 'symbole'));
+
+                    const actionsTh = document.createElement('th');
+                    actionsTh.className = 'px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider';
+                    actionsTh.textContent = 'Actions';
+                    headerRow.appendChild(actionsTh);
+
+                    thead.appendChild(headerRow);
                     table.appendChild(thead);
 
                     // Body
@@ -464,8 +502,27 @@ export default function AdminUnitesPage() {
             );
         }
 
-        // Tri alphabétique par nom d'unité
-        filtered.sort((a, b) => a.unite.localeCompare(b.unite));
+        // Tri dynamique
+        filtered.sort((a, b) => {
+            let aVal, bVal;
+
+            switch(sortColumn) {
+                case 'unite':
+                    aVal = a.unite || '';
+                    bVal = b.unite || '';
+                    break;
+                case 'symbole':
+                    aVal = a.symbole || '';
+                    bVal = b.symbole || '';
+                    break;
+                default:
+                    aVal = a.unite || '';
+                    bVal = b.unite || '';
+            }
+
+            const comparison = aVal.toString().localeCompare(bVal.toString());
+            return sortDirection === 'asc' ? comparison : -comparison;
+        });
 
         filteredUnites = filtered;
 
@@ -476,6 +533,17 @@ export default function AdminUnitesPage() {
         if (currentPage > totalPages) {
             currentPage = totalPages;
         }
+    }
+
+    function handleSort(column) {
+        if (sortColumn === column) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortColumn = column;
+            sortDirection = 'asc';
+        }
+        filterUnites();
+        render();
     }
 
     // Chargement des données
