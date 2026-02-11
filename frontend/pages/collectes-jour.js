@@ -26,14 +26,14 @@ export default function CollectesJourPage() {
     // Header
     function renderHeader() {
         const header = document.createElement('div');
-        header.className = 'bg-gradient-to-r from-green-600 to-green-800 rounded-lg shadow-lg p-6 mb-6';
+        header.className = 'bg-indigo-700 p-6 text-white text-center shadow-md rounded-xl mb-6';
 
         const title = document.createElement('h1');
-        title.className = 'text-3xl font-bold text-white mb-2';
+        title.className = 'text-2xl font-bold tracking-wide';
         title.textContent = 'Collectes du Jour';
 
         const subtitle = document.createElement('p');
-        subtitle.className = 'text-green-100';
+        subtitle.className = 'text-indigo-200 text-sm mt-1';
         const today = new Date().toLocaleDateString('fr-FR', {
             weekday: 'long',
             day: 'numeric',

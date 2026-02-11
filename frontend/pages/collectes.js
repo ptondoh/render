@@ -2817,7 +2817,6 @@ export default function CollectesPage() {
             container.appendChild(renderLoader());
         } else {
             container.appendChild(renderHeader());
-            container.appendChild(renderImportSection());
             container.appendChild(renderDivider());
             container.appendChild(renderLocationSection());
             container.appendChild(renderProduitsSection());
