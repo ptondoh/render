@@ -132,6 +132,14 @@ const routes = {
             return AdminMarchesPage();
         }
     },
+    '/admin/import': {
+        title: 'Import CSV/Excel - SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: AdminImportPage } = await import('./pages/admin-import.js');
+            return AdminImportPage();
+        }
+    },
     '404': {
         title: 'Page non trouvée - SAP',
         requireAuth: false,

@@ -324,6 +324,15 @@ export default function DashboardPage() {
             () => window.location.hash = '#/admin/marches'
         ));
 
+        // Tuile 7: Import CSV/Excel
+        configGrid.appendChild(renderStatCard(
+            'Import CSV/Excel',
+            '📊',
+            'Importer des collectes en masse',
+            'primary',
+            () => window.location.hash = '#/admin/import'
+        ));
+
         content.appendChild(configGrid);
 
         return content;
