@@ -65,7 +65,6 @@ Le **Système d'Alerte Précoce (SAP)** pour la sécurité alimentaire en Haïti
   - Marché
   - Période
   - Date
-- Export des données (CSV/Excel)
 - Statistiques en temps réel
 
 #### Endpoints API
@@ -127,6 +126,44 @@ Accessibles uniquement aux utilisateurs avec le rôle **bailleur**.
 - Vérification du rôle `bailleur` sur chaque page
 - Message d'erreur si accès refusé : "Cette page est réservée aux administrateurs"
 - Redirection automatique vers le dashboard
+
+---
+
+### 7. Import CSV/Excel (Admin) ✅
+
+#### Page dédiée (`/admin/import`)
+Accessible **uniquement aux administrateurs** (rôle `bailleur`).
+
+#### Fonctionnalités
+- **Téléchargement de templates**
+  - Template Excel (.xlsx) avec structure prédéfinie
+  - Template CSV avec en-têtes
+- **Zone de dépôt de fichiers**
+  - Drag & drop ou sélection de fichier
+  - Support CSV et Excel
+  - Validation du format
+- **Aperçu avant import**
+  - Affichage des 20 premières lignes
+  - Vérification des données
+  - Bouton d'annulation disponible
+- **Import en masse**
+  - Création de collectes multiples en une seule opération
+  - Validation des données (marchés, produits, agents existants)
+  - Rapport détaillé après import (succès/erreurs)
+- **Instructions complètes**
+  - Format des données requis
+  - Exemples de valeurs
+  - Liste des périodes acceptées
+
+#### Accès
+- **Dashboard** : Tuile dédiée "Import CSV/Excel" 📊
+- **Menu Administration** : Lien dans le dropdown
+- **URL directe** : `#/admin/import`
+
+#### Sécurité
+- Vérification du rôle `bailleur` avant affichage
+- Message d'erreur si accès refusé : "Cette page est réservée aux administrateurs"
+- **Fonctionnalité retirée** de la vue agent (anciennement dans `/collectes`)
 
 ---
 
@@ -378,7 +415,15 @@ searchInput.addEventListener('input', (e) => {
 ✅ admin-departements → Saisie complète sans perte de focus
 ```
 
-**Taux de réussite global : 100% (26/26 tests passés)**
+#### Test 7 : Import CSV/Excel restriction et accès admin ✅
+```
+✅ agent@sap.ht → Section d'import retirée de la page Collectes
+✅ admin@sap.ht → Accès page /admin/import fonctionnel
+✅ admin@sap.ht → Tuile "Import CSV/Excel" présente dans le dashboard
+✅ admin@sap.ht → Lien "Import CSV/Excel" présent dans le menu Administration
+```
+
+**Taux de réussite global : 100% (27/27 tests passés)**
 
 ---
 
@@ -441,7 +486,8 @@ sap-minimaliste/
 │   │       ├── admin-unites.js
 │   │       ├── admin-marches.js
 │   │       ├── admin-communes.js
-│   │       └── admin-departements.js
+│   │       ├── admin-departements.js
+│   │       └── admin-import.js      # Import CSV/Excel
 │   │
 │   ├── modules/                 # Modules JS
 │   │   ├── auth.js              # Gestion auth
@@ -463,6 +509,7 @@ sap-minimaliste/
 ├── test_*.py                     # Scripts de test Python
 │   ├── test_admin_consultation.py
 │   ├── test_all_roles_collectes.py
+│   ├── test_import_admin.py      # Test import admin-only
 │   └── test_stats.py
 │
 ├── .env                          # Variables d'environnement
@@ -513,6 +560,36 @@ mongod --dbpath C:\data\db
 ---
 
 ## 🔄 Dernières Modifications
+
+### En cours (2026-02-10)
+```
+feat: Réorganiser import CSV/Excel en fonctionnalité admin-only
+
+CHANGEMENTS:
+- Retrait de la section d'import de la page Collectes (vue agent)
+- Création de la page dédiée /admin/import
+  * Accessible uniquement aux administrateurs (rôle bailleur)
+  * Templates Excel et CSV téléchargeables
+  * Zone drag & drop pour upload
+  * Aperçu des données avant import
+  * Instructions détaillées d'utilisation
+
+- Ajout de la tuile "Import CSV/Excel" dans le dashboard admin
+- Ajout du lien dans le menu Administration (desktop + mobile)
+
+FICHIERS MODIFIÉS:
+- frontend/pages/collectes.js (suppression de renderImportSection)
+- frontend/pages/admin-import.js (nouveau fichier - 680+ lignes)
+- frontend/app.js (nouvelle route /admin/import)
+- frontend/pages/dashboard.js (7ème tuile admin)
+- frontend/index.html (liens menu desktop + mobile)
+
+Tests Playwright: 100% réussite (4/4 tests passés)
+- ✅ Agent ne voit plus la section d'import
+- ✅ Admin peut accéder à /admin/import
+- ✅ Tuile présente dans le dashboard
+- ✅ Lien présent dans le menu
+```
 
 ### Commit : `32c78c8` (2026-02-10)
 ```
@@ -649,9 +726,9 @@ DEBUG=False
 | Métrique | Valeur |
 |----------|--------|
 | **Lignes de code (backend)** | ~3,000 |
-| **Lignes de code (frontend)** | ~8,000 |
-| **Nombre de fichiers** | ~80 |
-| **Tests automatisés** | 12 (100% réussite) |
+| **Lignes de code (frontend)** | ~8,700 |
+| **Nombre de fichiers** | ~81 |
+| **Tests automatisés** | 13 (100% réussite) |
 | **Couverture de test** | Pages principales validées |
 | **Temps de réponse API** | <100ms (local) |
 | **Score Lighthouse** | À mesurer |
