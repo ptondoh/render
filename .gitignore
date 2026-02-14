@@ -61,4 +61,4 @@ test_*.json
 test_*.html
 
 # Claude Code
-.claude/
+#.claude/
