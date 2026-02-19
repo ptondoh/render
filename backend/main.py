@@ -25,7 +25,8 @@ from backend.routers import (
     marches as marches_router,
     collectes as collectes_router,
     alertes as alertes_router,
-    import_collectes as import_collectes_router
+    import_collectes as import_collectes_router,
+    dashboard as dashboard_router
 )
 
 # Configuration du logging
@@ -86,6 +87,7 @@ app = FastAPI(
     * **Marchés** - Gestion des marchés locaux (6 endpoints)
     * **Collectes de prix** - Collecte de prix sur les marchés avec mode hors-ligne (10 endpoints)
     * **Alertes** - Système d'alertes automatique à 4 niveaux (8 endpoints)
+    * **Dashboard décideurs** - Vue nationale, indicateurs détaillés, drill-down géographique (3 endpoints)
 
     ## Système d'Alertes:
 
@@ -142,6 +144,7 @@ app.include_router(marches_router.router)
 app.include_router(collectes_router.router)
 app.include_router(alertes_router.router)
 app.include_router(import_collectes_router.router)
+app.include_router(dashboard_router.router)
 
 
 # ============================================================================
