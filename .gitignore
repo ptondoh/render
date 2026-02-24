@@ -59,6 +59,64 @@ playwright/.cache/
 # Test files
 test_*.json
 test_*.html
+test_*.py
+test_*.png
+test_*.cjs
+
+# Check/Debug scripts
+check_*.py
+debug_*.py
+verify_*.py
+fix_*.py
+
+# Migration/Seed scripts (temporaires)
+migrate_*.py
+seed_*.py
+copy_*.py
+add_*.py
+find_*.py
+count_*.py
+reset_*.py
+
+# Captures d'écran
+*.png
+captures/
+debug_*.png
+prod_*.png
+fresh_*.png
+
+# Documents temporaires
+*.docx
+*.doc
+
+# Fichiers HTML temporaires
+*.html
+!index.html
+
+# Scripts Playwright de debug
+tests/*-debug.spec.js
+tests/*-filtres.spec.js
+
+# Fichiers temporaires divers
+nul
+0
+*.tmp
+*.bak
+*.backup
+clear-cache.bat
+
+# Scripts backend temporaires
+backend/scripts/setup_*.py
+backend/scripts/seed_*.py
+backend/scripts/verify_*.py
+backend/scripts/ajouter_*.py
+backend/scripts/create_*.py
+backend/test_*.py
+backend/fix_*.py
+backend/routers/nul
+
+# Frontend temporaires
+frontend/pages/admin-import.js
 
 # Claude Code
 #.claude/
