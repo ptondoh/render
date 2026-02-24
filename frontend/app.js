@@ -140,6 +140,32 @@ const routes = {
             return AdminImportPage();
         }
     },
+
+    // ── Module 6 : Tableau de bord pour décideurs ──────────────────────────
+    '/tableau-bord-national': {
+        title: 'Vue nationale – SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: TableauBordNationalPage } = await import('./pages/tableau-bord-national.js');
+            return TableauBordNationalPage();
+        }
+    },
+    '/indicateurs-detailles': {
+        title: 'Indicateurs détaillés – SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: IndicateursDetaillesPage } = await import('./pages/indicateurs-detailles.js');
+            return IndicateursDetaillesPage();
+        }
+    },
+    '/drilldown-geo': {
+        title: 'Drill-down géographique – SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: DrilldownGeoPage } = await import('./pages/drilldown-geo.js');
+            return DrilldownGeoPage();
+        }
+    },
     '404': {
         title: 'Page non trouvée - SAP',
         requireAuth: false,
@@ -193,6 +219,22 @@ class Router {
             // Fermer le dropdown quand on clique ailleurs
             document.addEventListener('click', () => {
                 userMenuDropdown.classList.add('hidden');
+            });
+        }
+
+        // Menu Analyse dropdown (Module 6)
+        const analyseMenuButton = document.getElementById('analyse-menu-button');
+        const analyseMenuDropdown = document.getElementById('analyse-menu-dropdown');
+
+        if (analyseMenuButton && analyseMenuDropdown) {
+            analyseMenuButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                analyseMenuDropdown.classList.toggle('hidden');
+                if (userMenuDropdown) userMenuDropdown.classList.add('hidden');
+                if (adminMenuDropdown) adminMenuDropdown.classList.add('hidden');
+            });
+            document.addEventListener('click', () => {
+                analyseMenuDropdown.classList.add('hidden');
             });
         }
 
@@ -267,6 +309,8 @@ class Router {
         const userInitialsEl = document.getElementById('user-initials');
         const adminMenuDesktop = document.getElementById('admin-menu-desktop');
         const adminMenuMobile = document.getElementById('admin-menu-mobile');
+        const analyseMenuDesktop = document.getElementById('analyse-menu-desktop');
+        const analyseMenuMobile = document.getElementById('analyse-menu-mobile');
 
         if (auth.isAuthenticated()) {
             // Afficher la navigation
@@ -278,6 +322,15 @@ class Router {
             }
             if (userInitialsEl) {
                 userInitialsEl.textContent = auth.getUserInitials();
+            }
+
+            // Afficher/masquer le menu Analyse (décideur + bailleur) – Module 6
+            const hasAnalyseAccess = auth.hasAnyRole(['décideur', 'bailleur']);
+            if (analyseMenuDesktop) {
+                analyseMenuDesktop.classList.toggle('hidden', !hasAnalyseAccess);
+            }
+            if (analyseMenuMobile) {
+                analyseMenuMobile.classList.toggle('hidden', !hasAnalyseAccess);
             }
 
             // Afficher/masquer les menus admin selon le rôle (bailleur uniquement)
