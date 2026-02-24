@@ -828,7 +828,232 @@ python test_all_roles_collectes.py
 
 ---
 
-## 🏆 État Actuel : PRODUCTION READY ✅
+## 🔒 Audit de Sécurité (2026-02-23)
+
+### Score Global : **7.7/10 - BON** ✅
+
+Un audit de sécurité complet a été réalisé. Le système présente une **base de sécurité solide** avec quelques améliorations à apporter avant le déploiement en production.
+
+---
+
+### ✅ Points Forts Confirmés
+
+#### 1. Authentification JWT ✅
+- ✅ Utilisation de **bcrypt** pour le hachage des mots de passe
+- ✅ Limite de 72 bytes pour bcrypt respectée
+- ✅ Tokens JWT avec expiration (24h pour access, 7j pour refresh)
+- ✅ Vérification du type de token (access/refresh/mfa_pending)
+- ✅ MFA (TOTP) avec backup codes chiffrés
+- **Fichiers :** `backend/services/auth.py`, `backend/routers/auth.py`
+
+#### 2. RBAC (Contrôle d'Accès) ✅
+- ✅ Système de rôles bien implémenté (agent/décideur/bailleur)
+- ✅ Vérification des rôles sur chaque endpoint sensible
+- ✅ Middleware RBAC séparé et réutilisable
+- ✅ Agents ne voient que leurs propres collectes
+- **Fichiers :** `backend/middleware/rbac.py`, `backend/routers/collectes.py`
+
+#### 3. Validation des Données ✅
+- ✅ **Pydantic** pour validation automatique
+- ✅ Validation des emails avec `EmailStr`
+- ✅ Contraintes sur les mots de passe (min 8 caractères)
+- ✅ Validation des ObjectId MongoDB
+- **Fichier :** `backend/models.py`
+
+#### 4. CORS et Configuration ✅
+- ✅ Configuration CORS restrictive via variables d'environnement
+- ✅ `allow_credentials=True` pour les cookies sécurisés
+- ✅ Origins configurables (pas de wildcard "*")
+- **Fichier :** `backend/main.py`
+
+#### 5. Audit Logs ✅
+- ✅ Logs d'authentification (succès/échec)
+- ✅ Logs des actions sensibles (création utilisateur, MFA)
+- ✅ Capture de l'IP cliente
+- **Fichier :** `backend/middleware/audit.py`
+
+#### 6. Gestion des Secrets ✅
+- ✅ Variables d'environnement avec `.env`
+- ✅ Fichier `.env.example` fourni sans secrets réels
+- ✅ Secrets MFA chiffrés avant stockage
+- ✅ Backup codes MFA hachés avec bcrypt
+- **Fichiers :** `backend/config.py`, `.env.example`
+
+---
+
+### ⚠️ Vulnérabilités Identifiées (À Corriger)
+
+#### 🔴 CRITIQUE #1 : Exposition de Détails d'Erreur
+**Localisation :** `backend/main.py:162`
+**Risque :** En développement, les stack traces complètes sont exposées
+**Impact :** Révèle la structure interne de l'application à un attaquant
+**Solution :**
+```python
+# Vérifier que APP_DEBUG=False en production
+"detail": str(exc) if settings.is_development else "Contactez l'administrateur"
+```
+**Action :** ✅ Déjà géré - Vérifier configuration production
+
+---
+
+#### 🟡 MOYEN #2 : Pas de Rate Limiting
+**Localisation :** `backend/routers/auth.py` (endpoints login, verify-mfa)
+**Risque :** Attaques par force brute sur login et codes MFA
+**Impact :** Un attaquant peut tester des milliers de combinaisons
+**Solution :**
+```python
+# Ajouter slowapi ou similar
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+
+@router.post("/login")
+@limiter.limit("5/minute")  # 5 tentatives par minute
+async def login(...):
+```
+**Action :** 🔧 À implémenter avant production
+
+---
+
+#### 🟡 MOYEN #3 : Pas de Protection CSRF
+**Localisation :** Frontend (`frontend/modules/api.js`)
+**Risque :** Attaques CSRF si l'API est accessible depuis un autre domaine
+**Impact :** Un site malveillant peut faire des requêtes au nom de l'utilisateur
+**Solution :**
+- Ajouter un token CSRF dans les requêtes POST/PUT/DELETE
+- Ou utiliser le pattern `SameSite` cookie avec `SameSite=Strict`
+**Action :** 🔧 À implémenter avant production
+
+---
+
+#### 🟡 MOYEN #4 : Tokens JWT dans localStorage
+**Localisation :** `frontend/modules/auth.js:58-59`
+**Risque :** Si une faille XSS existe, les tokens sont accessibles via JavaScript
+**Impact :** Vol de session utilisateur
+**Solution :**
+- **Option 1 :** Utiliser des cookies `HttpOnly` (inaccessibles depuis JS)
+- **Option 2 :** Garder localStorage mais ajouter une politique CSP stricte
+**Action :** 🔧 À évaluer selon architecture
+
+---
+
+#### 🟢 FAIBLE #5 : Pas de Headers de Sécurité HTTP
+**Localisation :** `backend/main.py` (manque middleware)
+**Risque :** Absence de headers `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`
+**Impact :** Vulnérabilités mineures (clickjacking, MIME sniffing)
+**Solution :**
+```python
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
+
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*.sap.ht"])
+if settings.is_production:
+    app.add_middleware(HTTPSRedirectMiddleware)
+```
+**Action :** 🔧 Recommandé pour production
+
+---
+
+#### 🟢 FAIBLE #6 : Pas de Validation Complexité Mot de Passe
+**Localisation :** `backend/models.py:64`
+**Risque :** Mots de passe faibles acceptés (ex: "12345678")
+**Impact :** Comptes facilement compromis
+**Solution :**
+```python
+@field_validator('password')
+def validate_password_strength(cls, v):
+    if not re.search(r'[A-Z]', v):
+        raise ValueError('Doit contenir une majuscule')
+    if not re.search(r'[a-z]', v):
+        raise ValueError('Doit contenir une minuscule')
+    if not re.search(r'\d', v):
+        raise ValueError('Doit contenir un chiffre')
+    return v
+```
+**Action :** 📋 Nice to have
+
+---
+
+#### 🟢 FAIBLE #7 : Pas de Timeout MongoDB
+**Localisation :** `backend/routers/collectes.py` et autres
+**Risque :** Requêtes MongoDB bloquées indéfiniment
+**Impact :** Déni de service si la DB est lente
+**Solution :**
+```python
+await db.collectes_prix.find(query).max_time_ms(5000).to_list(None)
+```
+**Action :** 📋 Recommandé
+
+---
+
+#### 🟢 FAIBLE #8 : Validation Type de Fichier Import CSV
+**Localisation :** `backend/routers/import_collectes.py`
+**Risque :** Upload de fichiers malveillants déguisés en CSV
+**Impact :** Exécution de code si le fichier est mal parsé
+**Solution :**
+- Vérifier le magic number du fichier (pas juste l'extension)
+- Limiter la taille des fichiers uploadés
+- Scanner les fichiers pour malware si possible
+**Action :** 📋 Recommandé
+
+---
+
+### 📊 Scores par Catégorie
+
+| Catégorie | Score | Commentaire |
+|-----------|-------|-------------|
+| **Authentification** | 9/10 | Excellent (JWT + MFA + bcrypt) |
+| **Autorisation** | 9/10 | RBAC bien implémenté |
+| **Validation** | 8/10 | Pydantic correct, manque complexité MdP |
+| **Protection DDoS** | 5/10 | ⚠️ Pas de rate limiting |
+| **Headers Sécurité** | 6/10 | ⚠️ Manque CSP, HSTS |
+| **Gestion Secrets** | 9/10 | Bonne pratique avec .env |
+| **Logging/Audit** | 8/10 | Logs présents, à améliorer |
+
+---
+
+### 🎯 Plan d'Action Sécurité
+
+#### Priorité 1 - AVANT Production (Critique)
+- [ ] **Vérifier `APP_DEBUG=False`** en production (.env)
+- [ ] **Implémenter Rate Limiting** sur login/MFA (slowapi)
+- [ ] **Ajouter Protection CSRF** ou cookies HttpOnly
+
+#### Priorité 2 - Recommandé (Important)
+- [ ] Ajouter headers de sécurité HTTP
+- [ ] Validation complexité mot de passe
+- [ ] Timeout MongoDB queries
+- [ ] Cookies HttpOnly pour tokens JWT (alternative localStorage)
+
+#### Priorité 3 - Nice to Have (Améliorations)
+- [ ] Politique CSP stricte
+- [ ] Scanner de fichiers uploadés
+- [ ] Monitoring temps réel (Sentry)
+- [ ] Tests de pénétration automatisés
+
+---
+
+### 📝 Recommandations Générales
+
+1. **Environnement Production**
+   - Utiliser HTTPS uniquement (TLS 1.2+)
+   - Configurer un WAF (Web Application Firewall)
+   - Mettre en place un système de monitoring/alerting
+
+2. **Maintenance Continue**
+   - Mettre à jour régulièrement les dépendances
+   - Scanner les vulnérabilités avec `safety` (Python) et `npm audit` (Node)
+   - Audits de sécurité périodiques (tous les 6 mois)
+
+3. **Documentation**
+   - Documenter les politiques de sécurité
+   - Former les utilisateurs aux bonnes pratiques
+   - Avoir un plan de réponse aux incidents
+
+---
+
+## 🏆 État Actuel : PRODUCTION READY (avec réserves) ✅⚠️
 
 Le système est **fonctionnel et testé** :
 - ✅ Authentification sécurisée
@@ -838,8 +1063,14 @@ Le système est **fonctionnel et testé** :
 - ✅ Pages admin accessibles
 - ✅ Bugs majeurs corrigés
 - ✅ Tests validés à 100%
+- ✅ **Audit de sécurité réalisé (Score 7.7/10)**
 
-**Prêt pour déploiement en production.**
+**⚠️ Actions critiques avant production :**
+- Rate Limiting sur authentification
+- Protection CSRF
+- Vérification configuration production (DEBUG=False)
+
+**Prêt pour déploiement en production après corrections des points critiques.**
 
 ---
 
