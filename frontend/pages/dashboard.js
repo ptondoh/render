@@ -207,6 +207,37 @@ export default function DashboardPage() {
 
         content.appendChild(statsGrid);
 
+        // ── Module 6 : Liens analyse pour décideurs ─────────────────────────
+        const analyseSection = document.createElement('div');
+        analyseSection.className = 'mb-2';
+
+        const analyseTitre = document.createElement('h2');
+        analyseTitre.className = 'text-lg font-semibold text-gray-900 mb-3';
+        analyseTitre.textContent = '📊 Tableau de bord d\'analyse';
+        analyseSection.appendChild(analyseTitre);
+
+        const analyseGrid = document.createElement('div');
+        analyseGrid.className = 'grid grid-cols-1 md:grid-cols-3 gap-4';
+
+        [
+            { href: '#/tableau-bord-national', icon: '🗺️', titre: 'Vue nationale', desc: 'Carte interactive + KPIs', color: 'blue' },
+            { href: '#/indicateurs-detailles?type=top10', icon: '🏆', titre: 'Indicateurs détaillés', desc: 'Top 10 zones, prix, historique', color: 'orange' },
+            { href: '#/drilldown-geo', icon: '🔍', titre: 'Drill-down géographique', desc: 'Explorer jusqu\'à la commune', color: 'green' }
+        ].forEach(item => {
+            const card = document.createElement('a');
+            card.href = item.href;
+            card.className = `block p-4 bg-white rounded-lg shadow border border-${item.color}-200 hover:border-${item.color}-400 hover:shadow-md transition-all`;
+            card.innerHTML = `
+                <div class="text-2xl mb-2">${item.icon}</div>
+                <div class="font-semibold text-gray-900 mb-1">${item.titre}</div>
+                <div class="text-sm text-gray-500">${item.desc}</div>
+            `;
+            analyseGrid.appendChild(card);
+        });
+
+        analyseSection.appendChild(analyseGrid);
+        content.appendChild(analyseSection);
+
         // Actions rapides
         const alertesCard = Card({
             title: 'Gestion des alertes',
