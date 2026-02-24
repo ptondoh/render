@@ -119,4 +119,4 @@ backend/routers/nul
 frontend/pages/admin-import.js
 
 # Claude Code
-.claude/
+#.claude/
