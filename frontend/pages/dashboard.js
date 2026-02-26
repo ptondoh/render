@@ -297,72 +297,50 @@ export default function DashboardPage() {
 
         content.appendChild(sectionTitle);
 
-        // Tuiles de configuration - 6 tuiles cliquables
+        // Helper tuile compacte (4 par ligne)
+        function renderTile(icon, title, desc, href) {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow-md border border-gray-200 p-5 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all';
+            card.setAttribute('data-tile', title);
+            card.onclick = () => window.location.hash = href;
+
+            const iconEl = document.createElement('p');
+            iconEl.className = 'text-2xl mb-2';
+            iconEl.textContent = icon;
+
+            const titleEl = document.createElement('h3');
+            titleEl.className = 'text-sm font-medium text-gray-700 mb-1';
+            titleEl.textContent = title;
+
+            const descEl = document.createElement('p');
+            descEl.className = 'text-xs text-gray-500';
+            descEl.textContent = desc;
+
+            card.appendChild(iconEl);
+            card.appendChild(titleEl);
+            card.appendChild(descEl);
+
+            return card;
+        }
+
+        // 10 tuiles — 4 par ligne sur desktop, 2 par ligne sur mobile
         const configGrid = document.createElement('div');
-        configGrid.className = 'grid grid-cols-1 md:grid-cols-3 gap-6';
+        configGrid.className = 'grid grid-cols-2 md:grid-cols-4 gap-4';
 
-        // Tuile 1: Unités de mesure
-        configGrid.appendChild(renderStatCard(
-            'Unités de mesure',
-            '📏',
-            'Gérer les unités de mesure',
-            'default',
-            () => window.location.hash = '#/admin/unites'
-        ));
+        const tiles = [
+            { icon: '📏', title: 'Unités de mesure',  desc: 'Gérer les unités de mesure',         href: '#/admin/unites' },
+            { icon: '📂', title: 'Catégories',         desc: 'Gérer les catégories de produits',   href: '#/admin/categories' },
+            { icon: '🛒', title: 'Produits',            desc: 'Gérer les produits',                 href: '#/admin/produits' },
+            { icon: '🗺️', title: 'Départements',       desc: 'Gérer les départements',             href: '#/admin/departements' },
+            { icon: '🏘️', title: 'Communes',            desc: 'Gérer les communes',                 href: '#/admin/communes' },
+            { icon: '🏪', title: 'Marchés',             desc: 'Gérer les marchés',                  href: '#/admin/marches' },
+            { icon: '📊', title: 'Import CSV/Excel',   desc: 'Importer des collectes en masse',    href: '#/admin/import' },
+            { icon: '👥', title: 'Utilisateurs',        desc: 'Gérer les comptes utilisateurs',     href: '#/admin/utilisateurs' },
+            { icon: '🎭', title: 'Rôles',               desc: 'Gérer les rôles du système',         href: '#/admin/roles' },
+            { icon: '🔑', title: 'Permissions',         desc: 'Gérer les permissions',              href: '#/admin/permissions' },
+        ];
 
-        // Tuile 2: Catégories
-        configGrid.appendChild(renderStatCard(
-            'Catégories',
-            '📂',
-            'Gérer les catégories de produits',
-            'default',
-            () => window.location.hash = '#/admin/categories'
-        ));
-
-        // Tuile 3: Produits
-        configGrid.appendChild(renderStatCard(
-            'Produits',
-            '🛒',
-            'Gérer les produits',
-            'default',
-            () => window.location.hash = '#/admin/produits'
-        ));
-
-        // Tuile 4: Départements
-        configGrid.appendChild(renderStatCard(
-            'Départements',
-            '🗺️',
-            'Gérer les départements',
-            'default',
-            () => window.location.hash = '#/admin/departements'
-        ));
-
-        // Tuile 5: Communes
-        configGrid.appendChild(renderStatCard(
-            'Communes',
-            '🏘️',
-            'Gérer les communes',
-            'default',
-            () => window.location.hash = '#/admin/communes'
-        ));
-
-        // Tuile 6: Marchés
-        configGrid.appendChild(renderStatCard(
-            'Marchés',
-            '🏪',
-            'Gérer les marchés',
-            'default',
-            () => window.location.hash = '#/admin/marches'
-        ));
-
-        // Tuile 7: Import CSV/Excel
-        configGrid.appendChild(renderStatCard(
-            'Import CSV/Excel',
-            '📊',
-            'Importer des collectes en masse',
-            'primary',
-            () => window.location.hash = '#/admin/import'
-        ));
+        tiles.forEach(t => configGrid.appendChild(renderTile(t.icon, t.title, t.desc, t.href)));
 
         content.appendChild(configGrid);
 
