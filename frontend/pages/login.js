@@ -13,6 +13,7 @@ export default function LoginPage() {
     let isLoading = false;
     let mfaRequired = false;
     let tempToken = null;
+    let mfaMethod = 'totp'; // 'totp' ou 'email'
     let errorMessage = '';
     let emailValue = '';
     let passwordValue = '';
@@ -145,6 +146,7 @@ export default function LoginPage() {
                                 // Passer à l'étape MFA
                                 mfaRequired = true;
                                 tempToken = result.temp_token;
+                                mfaMethod = result.mfa_method || 'totp';
                                 isLoading = false;
                                 render();
                             } else {
@@ -183,7 +185,9 @@ export default function LoginPage() {
 
                     const subtitle = document.createElement('p');
                     subtitle.className = 'text-gray-600';
-                    subtitle.textContent = 'Entrez le code de votre application d\'authentification';
+                    subtitle.textContent = mfaMethod === 'email'
+                        ? 'Un code à 6 chiffres a été envoyé à votre adresse email'
+                        : 'Entrez le code de votre application d\'authentification';
 
                     header.appendChild(title);
                     header.appendChild(subtitle);

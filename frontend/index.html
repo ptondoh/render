@@ -103,6 +103,10 @@
                             <a href="#/admin/marches" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Marchés</a>
                             <hr class="my-1 border-gray-200">
                             <a href="#/admin/import" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-semibold">📊 Import CSV/Excel</a>
+                            <hr class="my-1 border-gray-200">
+                            <a href="#/admin/utilisateurs" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Utilisateurs</a>
+                            <a href="#/admin/roles" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Rôles</a>
+                            <a href="#/admin/permissions" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Permissions</a>
                         </div>
                     </div>
 
@@ -187,6 +191,16 @@
                     <a href="#/admin/import" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 pl-6 font-semibold">
                         📊 Import CSV/Excel
                     </a>
+                    <hr class="my-2 border-gray-200">
+                    <a href="#/admin/utilisateurs" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 pl-6">
+                        Utilisateurs
+                    </a>
+                    <a href="#/admin/roles" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 pl-6">
+                        Rôles
+                    </a>
+                    <a href="#/admin/permissions" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 pl-6">
+                        Permissions
+                    </a>
                 </div>
 
                 <a href="#/profil" class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50">
@@ -226,18 +240,18 @@
         crossorigin=""></script>
 
     <!-- Scripts -->
-    <script type="module" src="/modules/api.js"></script>
-    <script type="module" src="/modules/ui.js"></script>
-    <script type="module" src="/modules/auth.js"></script>
-    <script type="module" src="/app.js?v=1738549200"></script>
+    <script type="module" src="/modules/api.js?v=1738549201"></script>
+    <script type="module" src="/modules/ui.js?v=1738549201"></script>
+    <script type="module" src="/modules/auth.js?v=1738549201"></script>
+    <script type="module" src="/app.js?v=1738549201"></script>
 
     <!-- Service Worker Intelligent + Offline Management -->
     <script type="module">
-        import { initNetworkDetector } from '/modules/network-detector.js';
-        import { initOfflineManager } from '/modules/offline-manager.js';
-        import { ApiClient } from '/modules/api.js';
-        import { checkAndHandleVersionUpdate, getAppVersion, logVersionInfo, migrateData } from '/modules/version-manager.js';
-        import { showUpdateNotification } from '/modules/notification.js';
+        import { initNetworkDetector } from '/modules/network-detector.js?v=1738549201';
+        import { initOfflineManager } from '/modules/offline-manager.js?v=1738549201';
+        import { ApiClient } from '/modules/api.js?v=1738549201';
+        import { checkAndHandleVersionUpdate, getAppVersion, logVersionInfo, migrateData } from '/modules/version-manager.js?v=1738549201';
+        import { showUpdateNotification } from '/modules/notification.js?v=1738549201';
 
         // Configuration
         const API_BASE_URL = window.location.hostname === 'localhost'

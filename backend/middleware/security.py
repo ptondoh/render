@@ -74,6 +74,22 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Enrichir role_names depuis la collection roles (nouveau format ObjectId)
+    raw_roles = user_doc.get("roles", [])
+    role_ids = [ObjectId(r) for r in raw_roles if ObjectId.is_valid(str(r))]
+    if role_ids:
+        roles_col = get_collection("roles")
+        role_docs = await roles_col.find({"_id": {"$in": role_ids}}).to_list(None)
+        resolved_names = [rd["nom"] for rd in role_docs if "nom" in rd]
+    else:
+        # Ancien format : les rôles sont déjà des noms (ex: "agent", "décideur")
+        resolved_names = [r for r in raw_roles if isinstance(r, str) and not ObjectId.is_valid(r)]
+
+    # Fusionner avec role_names existant s'il y en a
+    existing_names = user_doc.get("role_names") or []
+    all_names = list(set(existing_names + resolved_names))
+    user_doc["role_names"] = all_names
+
     # Convertir en modèle Pydantic
     user = UserInDB(**user_doc)
 

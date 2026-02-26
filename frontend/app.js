@@ -81,7 +81,8 @@ const routes = {
         title: 'Mon profil - SAP',
         requireAuth: true,
         render: async () => {
-            return '<div class="text-center py-12"><h2 class="text-2xl font-bold text-gray-900 mb-4">Mon Profil</h2><p class="text-gray-600">À venir</p></div>';
+            const { default: ProfilPage } = await import('./pages/profil.js');
+            return ProfilPage();
         }
     },
     '/admin/unites': {
@@ -138,6 +139,30 @@ const routes = {
         render: async () => {
             const { default: AdminImportPage } = await import('./pages/admin-import.js');
             return AdminImportPage();
+        }
+    },
+    '/admin/utilisateurs': {
+        title: 'Gestion des utilisateurs - SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: AdminUtilisateursPage } = await import('./pages/admin-utilisateurs.js');
+            return AdminUtilisateursPage();
+        }
+    },
+    '/admin/roles': {
+        title: 'Gestion des rôles - SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: AdminRolesPage } = await import('./pages/admin-roles.js');
+            return AdminRolesPage();
+        }
+    },
+    '/admin/permissions': {
+        title: 'Gestion des permissions - SAP',
+        requireAuth: true,
+        render: async () => {
+            const { default: AdminPermissionsPage } = await import('./pages/admin-permissions.js');
+            return AdminPermissionsPage();
         }
     },
 
@@ -326,6 +351,7 @@ class Router {
 
             // Afficher/masquer le menu Analyse (décideur + bailleur) – Module 6
             const hasAnalyseAccess = auth.hasAnyRole(['décideur', 'bailleur']);
+            console.log('[RBAC] hasAnalyseAccess:', hasAnalyseAccess, 'roles:', auth.getCurrentUser()?.role_names);
             if (analyseMenuDesktop) {
                 analyseMenuDesktop.classList.toggle('hidden', !hasAnalyseAccess);
             }
@@ -335,6 +361,7 @@ class Router {
 
             // Afficher/masquer les menus admin selon le rôle (bailleur uniquement)
             const isBailleur = auth.hasRole('bailleur');
+            console.log('[RBAC] isBailleur:', isBailleur, 'roles:', auth.getCurrentUser()?.role_names);
             if (adminMenuDesktop) {
                 if (isBailleur) {
                     adminMenuDesktop.classList.remove('hidden');

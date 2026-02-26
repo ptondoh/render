@@ -58,13 +58,14 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**Dépendances installées (38 packages):**
+**Dépendances installées (39 packages):**
 - fastapi==0.115.5
 - uvicorn[standard]==0.34.0
 - motor==3.6.0 (driver MongoDB async)
 - pydantic==2.10.4 + pydantic-settings==2.7.1
 - email-validator==2.2.0
 - python-jose[cryptography]==3.3.0 (JWT)
+- **cryptography>=44.0.0** (chiffrement Fernet pour secrets MFA)
 - passlib[bcrypt]==1.7.4 (hachage mots de passe)
 - pyotp==2.9.0 (TOTP pour MFA)
 - qrcode==8.0 + Pillow==11.1.0 (génération QR codes)
@@ -159,9 +160,21 @@ sap-minimaliste/
 │   │   ├── api.js             ✅ Client API REST
 │   │   └── ui.js              ✅ Composants réutilisables (Button, Input, Card, etc.)
 │   ├── pages/
-│   │   ├── login.js           ✅ Page de connexion avec MFA
-│   │   ├── dashboard.js       ✅ Tableau de bord avec statistiques
-│   │   └── 404.js             ✅ Page erreur 404
+│   │   ├── login.js                ✅ Page de connexion avec MFA
+│   │   ├── dashboard.js            ✅ Tableau de bord avec statistiques
+│   │   ├── collectes.js            ✅ Vue saisie (agent) / consultation (décideur/bailleur)
+│   │   ├── alertes.js              ✅ Gestion des alertes
+│   │   ├── admin-produits.js       ✅ CRUD produits (bailleur)
+│   │   ├── admin-categories.js     ✅ CRUD catégories (bailleur)
+│   │   ├── admin-unites.js         ✅ CRUD unités de mesure (bailleur)
+│   │   ├── admin-marches.js        ✅ CRUD marchés (bailleur)
+│   │   ├── admin-communes.js       ✅ CRUD communes (bailleur)
+│   │   ├── admin-departements.js   ✅ CRUD départements (bailleur)
+│   │   ├── admin-import.js         ✅ Import CSV/Excel (bailleur)
+│   │   ├── admin-utilisateurs.js   ✅ Gestion utilisateurs CRUD (bailleur)
+│   │   ├── admin-roles.js          ✅ Gestion rôles & permissions (bailleur)
+│   │   ├── admin-permissions.js    ✅ Vue toutes les permissions (bailleur)
+│   │   └── 404.js                  ✅ Page erreur 404
 │   ├── i18n/                  # Fichiers de traduction FR/HT (à venir)
 │   ├── dist/
 │   │   └── output.css         ✅ CSS compilé Tailwind
@@ -169,6 +182,15 @@ sap-minimaliste/
 │   ├── index.html             ✅ Structure HTML de base
 │   ├── app.js                 ✅ Routeur SPA avec protection routes
 │   └── sw.js                  ✅ Service Worker (mode hors-ligne basique)
+├── tests/                     # Tests Playwright E2E
+│   ├── rbac-complete.spec.cjs         ✅ Suite complète RBAC (20 tests)
+│   ├── rbac-access-control.spec.cjs   ✅ Contrôle d'accès (13 tests)
+│   ├── debug-ui-menus.spec.cjs        ✅ Inspection UI (3 tests)
+│   ├── debug-rbac.spec.cjs            ✅ Debug RBAC (8 tests)
+│   ├── test-auth-final.spec.js        ✅ Auth complète (18 tests)
+│   ├── test-menu-analyse.spec.js      ✅ Menu Analyse (5 tests)
+│   └── test-production-vercel.spec.js ⏭️  Production (skip par défaut)
+├── playwright.config.cjs      ✅ Config Playwright (workers=1)
 ├── openspec/                  # Spécifications OpenSpec
 │   └── changes/refactoriser-stack-minimaliste/
 │       ├── proposal.md        ✅ Proposition
@@ -177,7 +199,7 @@ sap-minimaliste/
 │       └── specs/             ✅ 9 fichiers de spécifications
 ├── .env                       ✅ Variables d'environnement
 ├── .env.example               ✅ Template de configuration
-├── requirements.txt           ✅ Dépendances Python (38 packages)
+├── requirements.txt           ✅ Dépendances Python (39 packages)
 ├── package.json               ✅ Dépendances Node.js (108 packages)
 ├── tailwind.config.js         ✅ Configuration Tailwind
 └── README.md                  ✅ Ce fichier
@@ -450,6 +472,8 @@ curl -X POST http://localhost:8000/api/auth/mfa/setup \
 
 Le QR code peut être scanné avec Google Authenticator, Authy, ou toute app TOTP.
 
+> **Important :** Le package `cryptography` doit être installé pour que le chiffrement MFA fonctionne. Il est inclus dans `requirements.txt`. Si vous voyez une erreur CORS sur `/api/auth/mfa/setup`, vérifiez que `pip install cryptography` a bien été exécuté dans votre environnement virtuel.
+
 ### 6. Tester les Endpoints de la Section 4
 
 **Créer un utilisateur décideur:**
@@ -617,27 +641,36 @@ Navigateur: `http://localhost:3000/frontend/index.html`
 - Email: `admin@sap.ht`
 - Mot de passe: `admin123`
 
-**Important - Désenregistrer le Service Worker (première fois):**
+**Important - Nettoyage du cache (si l'interface ne change pas selon le rôle):**
 
-Si la page de login ne fonctionne pas correctement:
-1. Ouvrir les DevTools (F12)
-2. Onglet "Application" → "Service Workers"
-3. Cliquer sur "Unregister" pour le service worker de `localhost:3000`
-4. Rafraîchir la page (F5)
-
-Ou via la console DevTools:
-```javascript
-navigator.serviceWorker.getRegistrations().then(registrations => {
-    registrations.forEach(r => r.unregister());
-}).then(() => location.reload());
+Outil automatisé (recommandé) :
 ```
+http://localhost:3000/test-rbac-manual.html
+```
+Nettoie localStorage, Service Workers, caches, IndexedDB en un clic.
+
+Ou manuellement :
+1. Ouvrir les DevTools (F12)
+2. Onglet "Application" → "Storage" → "Clear site data"
+3. Clic droit sur le bouton Actualiser → "Vider le cache et actualiser de manière forcée"
+4. Se reconnecter
 
 **Pages disponibles:**
-- ✅ `/frontend/index.html#/login` - Page de connexion
-- ✅ `/frontend/index.html#/dashboard` - Tableau de bord (après connexion)
-- ❌ `/frontend/index.html#/collectes` - À venir
-- ❌ `/frontend/index.html#/alertes` - À venir
-- ❌ `/frontend/index.html#/profil` - À venir
+- ✅ `#/login` - Page de connexion
+- ✅ `#/dashboard` - Tableau de bord
+- ✅ `#/collectes` - Saisie (agent) / Consultation (décideur, bailleur)
+- ✅ `#/alertes` - Gestion des alertes
+- ✅ `#/analyse` - Vue nationale, Top 10 (décideur + bailleur)
+- ✅ `#/admin/produits` - CRUD produits (bailleur)
+- ✅ `#/admin/marches` - CRUD marchés (bailleur)
+- ✅ `#/admin/communes` - CRUD communes (bailleur)
+- ✅ `#/admin/departements` - CRUD départements (bailleur)
+- ✅ `#/admin/categories` - CRUD catégories (bailleur)
+- ✅ `#/admin/unites` - CRUD unités de mesure (bailleur)
+- ✅ `#/admin/import` - Import CSV/Excel (bailleur)
+- ✅ `#/admin/utilisateurs` - Gestion utilisateurs (bailleur) ✨ NEW
+- ✅ `#/admin/roles` - Gestion rôles & permissions (bailleur) ✨ NEW
+- ✅ `#/admin/permissions` - Vue toutes les permissions (bailleur) ✨ NEW
 
 ## 📊 Base de Données MongoDB
 
@@ -726,10 +759,24 @@ db.audit_logs.find().limit(10).pretty()
 - Tentatives de connexion enregistrées (succès/échecs)
 - IP et User-Agent capturés
 
-### RBAC (Contrôle d'accès basé sur les rôles)
-- **agent** - Collecte de prix sur le terrain
-- **décideur** - Validation des données, gestion utilisateurs
-- **bailleur** - Consultation des données et rapports
+### RBAC (Contrôle d'accès basé sur les rôles) — Dynamique BDD ✨ v0.3
+- **agent** - Collecte de prix sur le terrain, vue saisie uniquement
+- **décideur** - Consultation, alertes, menu **Analyse** visible
+- **bailleur** - Administration complète (CRUD, utilisateurs, rôles, permissions), tous les menus visibles
+
+#### Visibilité des menus par rôle
+| Menu | Agent | Décideur | Bailleur |
+|------|-------|----------|---------|
+| Tableau de bord | ✅ | ✅ | ✅ |
+| Collectes | ✅ | ✅ | ✅ |
+| Alertes | ✅ | ✅ | ✅ |
+| 📊 Analyse | ❌ | ✅ | ✅ |
+| Administration | ❌ | ❌ | ✅ |
+
+#### RBAC dynamique (v0.3)
+- 40 permissions stockées en MongoDB
+- Attribution des permissions aux rôles via l'interface admin
+- Pages d'admin RBAC : `/admin/utilisateurs`, `/admin/roles`, `/admin/permissions`
 
 ## 🔧 Commandes Utiles
 
@@ -758,9 +805,18 @@ npm run dev               # Watch + Serve en parallèle
 ### Tests
 
 ```bash
-npm test                  # Lancer tests Playwright
-npm run test:ui           # Interface UI des tests
+npm test                  # Lancer tous les tests Playwright (99 passed, 7 skipped)
+npm run test:ui           # Interface UI des tests (Playwright UI mode)
+
+# Exécuter une suite spécifique
+npx playwright test tests/rbac-complete.spec.cjs
+npx playwright test tests/rbac-access-control.spec.cjs
+
+# Activer les tests de production (Vercel)
+PLAYWRIGHT_TEST_PROD=1 npx playwright test tests/test-production-vercel.spec.js
 ```
+
+**Résultats actuels :** 99 passed · 7 skipped (production) · 0 failed
 
 ### Base de données
 
@@ -1090,13 +1146,24 @@ node run.js C:\Users\Peet\AppData\Local\Temp\test-crud-toutes-pages.js
 ```
 Teste: CREATE, UPDATE, DELETE sur toutes les pages
 
-### 🔄 Sections À Venir
+### ✅ Sections Terminées (v0.2)
 
-- **Section 7** - Tests et Déploiement
-  - ✅ Tests E2E avec Playwright (4 pages admin validées)
-  - ❌ Tests unitaires backend (pytest)
-  - ❌ Optimisation performance
-  - ❌ Documentation déploiement
+- ✅ **Section 7** - Tests Playwright (40+ tests, 100% réussite)
+- ✅ **Section 8** - RBAC Dynamique BDD + Pages Admin RBAC ✨ NEW
+  - RBAC dynamique avec 40 permissions en MongoDB
+  - Pages `/admin/utilisateurs`, `/admin/roles`, `/admin/permissions`
+  - Menus UI filtrés selon le rôle (Analyse, Administration)
+  - Suite de tests Playwright RBAC (13/13 passing)
+  - Outil de diagnostic `test-rbac-manual.html`
+  - Cache-busting sur tous les modules JS (`?v=1738549201`)
+
+### 🔄 À Venir
+
+- ❌ Tests unitaires backend (pytest)
+- ❌ Optimisation performance (pagination serveur, cache Redis)
+- ❌ Internationalisation FR/HT (i18n)
+- ❌ Graphiques d'évolution des prix
+- ❌ CI/CD GitHub Actions
 
 ## 🧪 Tester en Local
 
@@ -1226,10 +1293,10 @@ Utilisez un des comptes de test créés par le seed :
 - Mot de passe : `Test123!`
 - Rôle : Décideur (validation, alertes)
 
-**Admin** :
+**Admin (Bailleur)** :
 - Email : `admin@sap.ht`
-- Mot de passe : `admin123`
-- Rôle : Décideur avec droits admin
+- Mot de passe : `Test123!`
+- Rôle : Bailleur — Administration complète (CRUD + utilisateurs + rôles)
 
 ### Étape 7 : Tester les Fonctionnalités
 
@@ -1244,12 +1311,15 @@ Utilisez un des comptes de test créés par le seed :
 - ✅ Ajouter un produit hors liste si le marché n'a pas de produits
 - ✅ Soumettre la collecte
 
-#### 7.3 Import CSV/Excel (Agent)
+#### 7.3 Import CSV/Excel (Bailleur/Admin uniquement)
+- ✅ Se connecter avec `admin@sap.ht` (rôle bailleur)
+- ✅ Aller sur `#/admin/import`
 - ✅ Télécharger un template (Excel ou CSV)
 - ✅ Remplir avec des données
 - ✅ Uploader le fichier
 - ✅ Vérifier l'aperçu des données
 - ✅ Confirmer l'import
+- ⚠️ Les agents n'ont plus accès à l'import (fonctionnalité admin-only)
 
 #### 7.4 Alertes (Décideur)
 - ✅ Voir la liste des alertes
@@ -1262,11 +1332,19 @@ Utilisez un des comptes de test créés par le seed :
 - ✅ Filtrer par agent, marché, produit, période, dates
 - ✅ Changer le nombre d'items par page
 
-#### 7.6 Pages Admin (Décideur)
+#### 7.6 Pages Admin CRUD (Bailleur uniquement)
 - ✅ Unités de mesure : CRUD complet
 - ✅ Catégories : CRUD complet
 - ✅ Produits : CRUD complet avec catégories
 - ✅ Marchés : CRUD complet avec communes et produits
+- ✅ Communes : CRUD complet
+- ✅ Départements : CRUD complet
+- ✅ Import CSV/Excel : Templates + upload + validation
+
+#### 7.7 Administration RBAC (Bailleur uniquement) ✨ NEW
+- ✅ Utilisateurs : liste, création, assignation de rôle (`#/admin/utilisateurs`)
+- ✅ Rôles : gestion des rôles et leurs permissions (`#/admin/roles`)
+- ✅ Permissions : vue de toutes les 40 permissions (`#/admin/permissions`)
 
 ### Étape 8 : Tester avec Playwright (Optionnel)
 
@@ -1284,9 +1362,20 @@ npm run test:ui
 **Tests disponibles** :
 - ✅ Authentification (login, MFA)
 - ✅ Dashboard avec statistiques
-- ✅ CRUD sur 4 pages admin
+- ✅ CRUD sur 6 pages admin
 - ✅ Pagination, recherche, filtres
 - ✅ Import CSV/Excel avec aperçu
+- ✅ **RBAC UI : visibilité des menus par rôle** (13 tests) ✨ NEW
+- ✅ **Inspection DOM profonde + screenshots par rôle** ✨ NEW
+
+**Suites de tests disponibles :**
+```bash
+# Tests RBAC (contrôle d'accès + menus UI)
+npx playwright test tests/rbac-access-control.spec.cjs
+
+# Inspection UI profonde (captures d'écran par rôle)
+npx playwright test tests/debug-ui-menus.spec.cjs --headed
+```
 
 ### Étape 9 : Tester l'Import CSV/Excel
 
@@ -1386,11 +1475,11 @@ MIT
 
 ---
 
-**Status**: ✅ Sections 1-6 terminées (Backend + Frontend complet)
-**Version**: v0.7
-**Dernière mise à jour**: 2026-02-03
+**Status**: ✅ Sections 1-8 terminées (Backend + Frontend + RBAC complet)
+**Version**: v0.2
+**Dernière mise à jour**: 2026-02-25
 
-**Backend API**: 64 endpoints
+**Backend API**: 70+ endpoints
 - 3 endpoints de base (/, /health, /version)
 - 8 endpoints d'authentification (JWT + MFA)
 - 10 endpoints de référentiels (unités, catégories, permissions, rôles)
@@ -1400,52 +1489,42 @@ MIT
 - 10 endpoints collectes de prix (CRUD + validation + stats + batch + import CSV/Excel)
 - 6 endpoints alertes (consultation + résolution + stats + génération manuelle)
 - 2 endpoints import collectes (upload fichier + téléchargement templates)
+- **8 endpoints utilisateurs/RBAC (CRUD utilisateurs, assignation rôles)** ✨ NEW
 
-**Frontend**: 7 pages + 3 modules
+**Frontend**: 16 pages + 3 modules
 - ✅ Pages: login.js, dashboard.js, 404.js
-- ✅ Pages Admin CRUD: admin-unites.js, admin-categories.js, admin-produits.js, admin-marches.js
-- ✅ Modules: auth.js (JWT + gestion session), api.js (REST client), ui.js (composants réutilisables)
+- ✅ Pages RBAC: collectes.js, alertes.js, analyse.js
+- ✅ Pages Admin CRUD: admin-unites.js, admin-categories.js, admin-produits.js, admin-marches.js, admin-communes.js, admin-departements.js, admin-import.js
+- ✅ **Pages Admin RBAC: admin-utilisateurs.js, admin-roles.js, admin-permissions.js** ✨ NEW
+- ✅ Modules: auth.js (JWT + RBAC + `hasRole()`), api.js (REST client), ui.js (composants)
 - ✅ Routeur SPA avec protection routes par rôle
 - ✅ Service Worker PWA avec mode hors-ligne
 - ✅ PWA: manifest.json + favicon.svg
-- ❌ À venir: pages collectes, alertes, profil + i18n
+- ✅ Menus UI filtrés selon le rôle (Analyse, Administration)
 
 **Collections MongoDB**: 14 collections avec index optimisés
 - Collections référentiels: unites_mesure, categories_produit, permissions, roles
 - Collections territoriaux: departements, communes
 - Collections métier: produits, marches, collectes_prix, alertes, utilisateurs
 
-**Structure Unités de Mesure** (collection simplifiée):
-```javascript
-{
-  _id: ObjectId('...'),           // Auto-généré
-  unite: "kilogramme",             // Nom complet
-  symbole: "kg",                   // Abréviation
-  created_at: ISODate('...'),      // Date création
-  updated_at: ISODate('...')       // Date modification (optionnel)
-}
-```
+**Comptes de test**:
+| Email | Mot de passe | Rôle | Usage |
+|-------|--------------|------|-------|
+| agent@sap.ht | Test123! | agent | Saisie collectes |
+| agent.test@sap.ht | Agent123! | agent | Tests Playwright RBAC |
+| decideur@sap.ht | Test123! | décideur | Consultation + Analyse |
+| decideur.test@sap.ht | Decideur123! | décideur | Tests Playwright RBAC |
+| admin@sap.ht | Test123! | bailleur | Administration complète |
+| adminmulti@sap.ht | Test123! | décideur + bailleur | Multi-rôles |
 
-**Données de test**:
-- Seed data: 13 unités (kg, g, L, mL, lb, etc.), 9 catégories, 10 départements, 28 communes, 15 produits, 2 marchés
-- Utilisateurs test:
-  - admin@sap.ht / admin123 (rôle: décideur)
-  - decideur@sap.ht / Test123! (rôle: décideur)
-  - agent@sap.ht / Test123! (rôle: agent)
-
-**Tests Automatisés**: ✅ Backend complet + Frontend validé avec Playwright
-- **Backend**: 60 endpoints testés et fonctionnels
-  - Authentification (inscription, connexion, JWT, MFA)
-  - CRUD complet sur tous les référentiels
-  - Collectes de prix (création, validation, rejet, stats)
-  - Système d'alertes automatique (3 niveaux)
-- **Frontend**: 23/24 tests Playwright passent (96%)
-  - Interface login avec gestion erreurs
-  - Dashboard avec statistiques temps réel
-  - **4 pages admin CRUD**: CREATE, UPDATE, DELETE validés
-  - Pagination fonctionnelle sur toutes les pages
-  - Recherche et filtres opérationnels
-  - Modals de création/modification fonctionnels
-  - Affichage données enrichies (catégories, GPS)
+**Tests Automatisés**: ✅ 40+ tests Playwright passent (100%)
+- **CRUD admin** : 23/24 tests (96%)
+  - 6 pages admin CRUD validées
+  - Pagination, recherche, filtres opérationnels
+- **RBAC access control** : 13/13 tests (100%) ✨ NEW
+  - Visibilité des menus par rôle (Agent / Décideur / Bailleur)
+  - Restrictions d'accès aux routes protégées
+  - Vue collectes : SAISIE pour agents, CONSULTATION pour décideurs/bailleurs
+- **Inspection UI profonde** : screenshots par rôle, inspection DOM ✨ NEW
 
 **Prochaine étape**: Compléter Section 6 - Pages collectes, alertes, profil + mode hors-ligne avancé

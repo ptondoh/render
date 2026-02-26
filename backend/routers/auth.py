@@ -5,13 +5,15 @@ Gère l'inscription, la connexion, le MFA et les tokens JWT.
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
-from datetime import datetime
+from typing import Optional, Literal
+from datetime import datetime, timedelta
 from bson import ObjectId
+import secrets
 
 from backend.database import get_collection
 from backend.services import auth as auth_service
-from backend.models import UserCreate, UserResponse, UserInDB
+from backend.services.email import send_otp_email
+from backend.models import UserCreate, UserResponse, UserInDB, ChangePasswordRequest, ProfileUpdateRequest
 from backend.middleware.security import get_current_user
 from backend.middleware.rbac import require_decideur
 from backend.middleware.audit import (
@@ -20,6 +22,38 @@ from backend.middleware.audit import (
 )
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+async def get_role_names_from_ids(role_ids: list[str]) -> list[str]:
+    """
+    Récupère les noms des rôles depuis leurs IDs.
+    Retourne une liste de noms de rôles.
+    """
+    if not role_ids:
+        return []
+
+    roles_collection = get_collection("roles")
+
+    # Convertir les string IDs en ObjectId
+    object_ids = []
+    for role_id in role_ids:
+        if ObjectId.is_valid(role_id):
+            object_ids.append(ObjectId(role_id))
+
+    if not object_ids:
+        return []
+
+    # Charger les rôles depuis la BDD
+    roles = await roles_collection.find({"_id": {"$in": object_ids}}).to_list(None)
+
+    # Extraire les noms
+    role_names = [role.get("nom", "") for role in roles if "nom" in role]
+
+    return role_names
 
 
 # ============================================================================
@@ -39,13 +73,18 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     user: UserResponse
     mfa_required: bool = False
+    mfa_method: Optional[str] = None  # "totp" ou "email"
     temp_token: Optional[str] = None
 
 
 class MFAVerifyRequest(BaseModel):
-    """Requête de vérification MFA"""
-    temp_token: str
-    code: str = Field(..., min_length=6, max_length=6)
+    """Requête de vérification MFA (temp_token passé dans le header Authorization)"""
+    code: str = Field(..., min_length=6, max_length=8)
+
+
+class TwoFAMethodRequest(BaseModel):
+    """Requête de mise à jour de la méthode de 2e facteur"""
+    method: Literal["none", "totp", "email"] = Field(..., description="Méthode: none, totp, email")
 
 
 class MFASetupResponse(BaseModel):
@@ -125,11 +164,15 @@ async def register(user_data: UserCreate, request: Request):
         ip_address=ip_address
     )
 
+    # Enrichir avec les noms des rôles
+    role_names = await get_role_names_from_ids(user_doc["roles"])
+
     # Retourner l'utilisateur créé
     return UserResponse(
         id=user_doc["_id"],
         email=user_doc["email"],
-        role=user_doc["role"],
+        roles=user_doc["roles"],
+        role_names=role_names,
         nom=user_doc["nom"],
         departement_id=user_doc["departement_id"],
         telephone=user_doc["telephone"],
@@ -192,13 +235,30 @@ async def login(credentials: LoginRequest, request: Request):
 
     user = UserInDB(**user_doc)
 
-    # Si MFA activé, retourner un temp token
-    if user.mfa_enabled:
-        temp_token = auth_service.create_access_token(
-            data={"sub": str(user.id), "type": "mfa_pending"},
-            expires_delta=None  # Utilise le délai par défaut
+    # Déterminer la méthode de 2e facteur
+    two_fa_method = user.two_fa_method or "none"
+
+    if two_fa_method == "email":
+        # Générer un OTP à 6 chiffres
+        otp_code = ''.join(secrets.choice('0123456789') for _ in range(6))
+        otp_hash = auth_service.hash_password(otp_code)
+        otp_expires = datetime.utcnow() + timedelta(minutes=10)
+
+        # Stocker l'OTP en base
+        await users_collection.update_one(
+            {"_id": user_doc["_id"]},
+            {"$set": {"email_otp_hash": otp_hash, "email_otp_expires_at": otp_expires}}
         )
 
+        # Afficher l'OTP dans la console (mode dev)
+        await send_otp_email(user.email, otp_code)
+
+        temp_token = auth_service.create_access_token(
+            data={"sub": str(user.id), "type": "mfa_pending"},
+            expires_delta=timedelta(minutes=10)
+        )
+
+        role_names = await get_role_names_from_ids(user.roles)
         return LoginResponse(
             access_token="",
             token_type="bearer",
@@ -206,6 +266,7 @@ async def login(credentials: LoginRequest, request: Request):
                 id=user.id,
                 email=user.email,
                 roles=user.roles,
+                role_names=role_names,
                 nom=user.nom,
                 departement_id=user.departement_id,
                 telephone=user.telephone,
@@ -214,6 +275,35 @@ async def login(credentials: LoginRequest, request: Request):
                 created_at=user.created_at
             ),
             mfa_required=True,
+            mfa_method="email",
+            temp_token=temp_token
+        )
+
+    elif two_fa_method == "totp" or (two_fa_method == "none" and user.mfa_enabled):
+        # Flux TOTP (comportement existant)
+        temp_token = auth_service.create_access_token(
+            data={"sub": str(user.id), "type": "mfa_pending"},
+            expires_delta=None
+        )
+
+        role_names = await get_role_names_from_ids(user.roles)
+        return LoginResponse(
+            access_token="",
+            token_type="bearer",
+            user=UserResponse(
+                id=user.id,
+                email=user.email,
+                roles=user.roles,
+                role_names=role_names,
+                nom=user.nom,
+                departement_id=user.departement_id,
+                telephone=user.telephone,
+                actif=user.actif,
+                mfa_enabled=user.mfa_enabled,
+                created_at=user.created_at
+            ),
+            mfa_required=True,
+            mfa_method="totp",
             temp_token=temp_token
         )
 
@@ -232,6 +322,9 @@ async def login(credentials: LoginRequest, request: Request):
         ip_address=ip_address
     )
 
+    # Enrichir avec les noms des rôles
+    role_names = await get_role_names_from_ids(user.roles)
+
     return LoginResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -240,6 +333,7 @@ async def login(credentials: LoginRequest, request: Request):
             id=user.id,
             email=user.email,
             roles=user.roles,
+            role_names=role_names,
             nom=user.nom,
             departement_id=user.departement_id,
             telephone=user.telephone,
@@ -254,12 +348,22 @@ async def login(credentials: LoginRequest, request: Request):
 @router.post("/verify-mfa", response_model=LoginResponse)
 async def verify_mfa(verify_data: MFAVerifyRequest, request: Request):
     """
-    Vérifier le code MFA et retourner les tokens d'accès.
+    Vérifier le code MFA (TOTP ou OTP email) et retourner les tokens d'accès.
+    Le temp_token doit être passé dans le header Authorization: Bearer <temp_token>.
     """
     ip_address = get_client_ip(request)
 
+    # Extraire le temp_token depuis le header Authorization
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token temporaire manquant dans le header Authorization"
+        )
+    temp_token = auth_header[7:]
+
     # Décoder le temp token
-    payload = auth_service.decode_token(verify_data.temp_token)
+    payload = auth_service.decode_token(temp_token)
 
     if not payload or payload.get("type") != "mfa_pending":
         raise HTTPException(
@@ -271,7 +375,6 @@ async def verify_mfa(verify_data: MFAVerifyRequest, request: Request):
 
     # Récupérer l'utilisateur
     users_collection = get_collection("users")
-    # Convertir user_id (string du JWT) en ObjectId pour la requête MongoDB
     user_doc = await users_collection.find_one({"_id": ObjectId(user_id)})
 
     if not user_doc:
@@ -281,55 +384,78 @@ async def verify_mfa(verify_data: MFAVerifyRequest, request: Request):
         )
 
     user = UserInDB(**user_doc)
+    two_fa_method = user.two_fa_method or "none"
 
-    # Déchiffrer le secret MFA
-    decrypted_secret = auth_service.decrypt_mfa_secret(user.mfa_secret)
+    if two_fa_method == "email":
+        # Vérification OTP email
+        otp_hash = user_doc.get("email_otp_hash")
+        otp_expires = user_doc.get("email_otp_expires_at")
 
-    # Vérifier le code TOTP
-    is_valid_totp = auth_service.verify_totp(decrypted_secret, verify_data.code)
-
-    # Si le code TOTP n'est pas valide, vérifier les backup codes
-    if not is_valid_totp:
-        is_valid_backup = auth_service.verify_backup_code(
-            verify_data.code,
-            user.mfa_backup_codes
-        )
-
-        if is_valid_backup:
-            # Retirer le backup code utilisé
-            updated_codes = [
-                code for code in user.mfa_backup_codes
-                if not auth_service.verify_password(verify_data.code, code)
-            ]
-            await users_collection.update_one(
-                {"_id": user_id},
-                {"$set": {"mfa_backup_codes": updated_codes}}
+        if not otp_hash or not otp_expires:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Code OTP non généré. Veuillez vous reconnecter."
             )
 
-            await log_mfa_verification(
-                user_id=user_id,
-                success=True,
-                method="backup_code",
-                ip_address=ip_address
+        if datetime.utcnow() > otp_expires:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Code OTP expiré. Veuillez vous reconnecter."
             )
-        else:
+
+        if not auth_service.verify_password(verify_data.code, otp_hash):
             await log_mfa_verification(
-                user_id=user_id,
-                success=False,
-                method="totp",
-                ip_address=ip_address
+                user_id=user_id, success=False, method="email_otp", ip_address=ip_address
             )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Code MFA invalide"
+                detail="Code OTP invalide"
             )
-    else:
-        await log_mfa_verification(
-            user_id=user_id,
-            success=True,
-            method="totp",
-            ip_address=ip_address
+
+        # Effacer l'OTP utilisé
+        await users_collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$unset": {"email_otp_hash": "", "email_otp_expires_at": ""}}
         )
+        await log_mfa_verification(
+            user_id=user_id, success=True, method="email_otp", ip_address=ip_address
+        )
+
+    else:
+        # Vérification TOTP (comportement existant)
+        decrypted_secret = auth_service.decrypt_mfa_secret(user.mfa_secret)
+        is_valid_totp = auth_service.verify_totp(decrypted_secret, verify_data.code)
+
+        if not is_valid_totp:
+            is_valid_backup = auth_service.verify_backup_code(
+                verify_data.code,
+                user.mfa_backup_codes
+            )
+
+            if is_valid_backup:
+                updated_codes = [
+                    code for code in user.mfa_backup_codes
+                    if not auth_service.verify_password(verify_data.code, code)
+                ]
+                await users_collection.update_one(
+                    {"_id": user_id},
+                    {"$set": {"mfa_backup_codes": updated_codes}}
+                )
+                await log_mfa_verification(
+                    user_id=user_id, success=True, method="backup_code", ip_address=ip_address
+                )
+            else:
+                await log_mfa_verification(
+                    user_id=user_id, success=False, method="totp", ip_address=ip_address
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Code MFA invalide"
+                )
+        else:
+            await log_mfa_verification(
+                user_id=user_id, success=True, method="totp", ip_address=ip_address
+            )
 
     # Générer les tokens
     access_token = auth_service.create_access_token(
@@ -346,6 +472,9 @@ async def verify_mfa(verify_data: MFAVerifyRequest, request: Request):
         ip_address=ip_address
     )
 
+    # Enrichir avec les noms des rôles
+    role_names = await get_role_names_from_ids(user.roles)
+
     return LoginResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -354,6 +483,7 @@ async def verify_mfa(verify_data: MFAVerifyRequest, request: Request):
             id=user.id,
             email=user.email,
             roles=user.roles,
+            role_names=role_names,
             nom=user.nom,
             departement_id=user.departement_id,
             telephone=user.telephone,
@@ -415,15 +545,20 @@ async def get_me(current_user: UserInDB = Depends(get_current_user)):
     """
     Obtenir les informations de l'utilisateur authentifié actuel.
     """
+    # Enrichir avec les noms des rôles
+    role_names = await get_role_names_from_ids(current_user.roles)
+
     return UserResponse(
         id=current_user.id,
         email=current_user.email,
-        role=current_user.role,
+        roles=current_user.roles,
+        role_names=role_names,
         nom=current_user.nom,
         departement_id=current_user.departement_id,
         telephone=current_user.telephone,
         actif=current_user.actif,
         mfa_enabled=current_user.mfa_enabled,
+        two_fa_method=current_user.two_fa_method,
         created_at=current_user.created_at
     )
 
@@ -517,6 +652,7 @@ async def verify_mfa_setup(
         {
             "$set": {
                 "mfa_enabled": True,
+                "two_fa_method": "totp",
                 "updated_at": datetime.utcnow()
             }
         }
@@ -549,6 +685,7 @@ async def disable_mfa(
                 "mfa_enabled": False,
                 "mfa_secret": None,
                 "mfa_backup_codes": [],
+                "two_fa_method": "none",
                 "updated_at": datetime.utcnow()
             }
         }
@@ -567,3 +704,158 @@ async def disable_mfa(
         "message": "MFA désactivé avec succès",
         "mfa_enabled": False
     }
+
+
+# ============================================================================
+# Endpoints Profil Utilisateur
+# ============================================================================
+
+@router.post("/change-password", response_model=dict)
+async def change_password(
+    password_data: ChangePasswordRequest,
+    request: Request,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """
+    Changer son propre mot de passe.
+    Vérifie l'ancien mot de passe avant de mettre à jour.
+    """
+    users_collection = get_collection("users")
+    ip_address = get_client_ip(request)
+
+    # Récupérer le document complet (current_user ne contient pas password_hash)
+    user_doc = await users_collection.find_one({"_id": ObjectId(current_user.id)})
+    if not user_doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur non trouvé")
+
+    # Vérifier l'ancien mot de passe
+    if not auth_service.verify_password(password_data.current_password, user_doc["password_hash"]):
+        await log_action(
+            user_id=str(current_user.id),
+            action="password_change_failed",
+            resource_type="user",
+            resource_id=str(current_user.id),
+            details={"reason": "Mot de passe actuel incorrect"},
+            ip_address=ip_address
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mot de passe actuel incorrect"
+        )
+
+    # Hacher et sauvegarder le nouveau mot de passe
+    new_hash = auth_service.hash_password(password_data.new_password)
+    await users_collection.update_one(
+        {"_id": ObjectId(current_user.id)},
+        {"$set": {"password_hash": new_hash, "updated_at": datetime.utcnow()}}
+    )
+
+    await log_action(
+        user_id=str(current_user.id),
+        action="password_changed",
+        resource_type="user",
+        resource_id=str(current_user.id),
+        details={"method": "self_service"},
+        ip_address=ip_address
+    )
+
+    return {"message": "Mot de passe changé avec succès"}
+
+
+@router.patch("/two-fa-method", response_model=dict)
+async def update_two_fa_method(
+    data: TwoFAMethodRequest,
+    request: Request,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """
+    Mettre à jour la méthode de 2e facteur.
+    Si on quitte 'totp', les données TOTP sont effacées automatiquement.
+    Pour activer 'totp', utiliser le flux /mfa/setup + /mfa/verify-setup.
+    """
+    users_collection = get_collection("users")
+    ip_address = get_client_ip(request)
+
+    update_fields = {
+        "two_fa_method": data.method,
+        "updated_at": datetime.utcnow()
+    }
+
+    # Si on quitte totp, effacer les données TOTP
+    if data.method != "totp":
+        update_fields.update({
+            "mfa_enabled": False,
+            "mfa_secret": None,
+            "mfa_backup_codes": []
+        })
+
+    await users_collection.update_one(
+        {"_id": ObjectId(current_user.id)},
+        {"$set": update_fields}
+    )
+
+    await log_action(
+        user_id=str(current_user.id),
+        action="two_fa_method_updated",
+        resource_type="user",
+        resource_id=str(current_user.id),
+        details={"two_fa_method": data.method},
+        ip_address=ip_address
+    )
+
+    return {"message": f"Méthode de vérification mise à jour : {data.method}", "two_fa_method": data.method}
+
+
+@router.patch("/profile", response_model=UserResponse)
+async def update_profile(
+    profile_data: ProfileUpdateRequest,
+    request: Request,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    """
+    Mettre à jour les informations personnelles (nom, prenom, telephone uniquement).
+    Email et rôles ne sont pas modifiables via cet endpoint.
+    """
+    users_collection = get_collection("users")
+    ip_address = get_client_ip(request)
+
+    # Ne mettre à jour que les champs fournis
+    update_fields = {"updated_at": datetime.utcnow()}
+    if profile_data.nom is not None:
+        update_fields["nom"] = profile_data.nom.strip() or None
+    if profile_data.prenom is not None:
+        update_fields["prenom"] = profile_data.prenom.strip() or None
+    if profile_data.telephone is not None:
+        update_fields["telephone"] = profile_data.telephone.strip() or None
+
+    await users_collection.update_one(
+        {"_id": ObjectId(current_user.id)},
+        {"$set": update_fields}
+    )
+
+    updated_doc = await users_collection.find_one({"_id": ObjectId(current_user.id)})
+
+    await log_action(
+        user_id=str(current_user.id),
+        action="profile_updated",
+        resource_type="user",
+        resource_id=str(current_user.id),
+        details={"fields_updated": [k for k in update_fields if k != "updated_at"]},
+        ip_address=ip_address
+    )
+
+    role_names = await get_role_names_from_ids(updated_doc.get("roles", []))
+    return UserResponse(
+        id=updated_doc["_id"],
+        email=updated_doc["email"],
+        roles=updated_doc.get("roles", []),
+        role_names=role_names,
+        nom=updated_doc.get("nom"),
+        prenom=updated_doc.get("prenom"),
+        departement_id=updated_doc.get("departement_id"),
+        telephone=updated_doc.get("telephone"),
+        actif=updated_doc.get("actif", True),
+        mfa_enabled=updated_doc.get("mfa_enabled", False),
+        two_fa_method=updated_doc.get("two_fa_method", "none"),
+        created_at=updated_doc["created_at"]
+    )

@@ -82,8 +82,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode.update({
         "exp": expire,
         "iat": datetime.utcnow(),
-        "type": "access"
     })
+    # Ne pas écraser le type si déjà défini (ex: "mfa_pending")
+    if "type" not in to_encode:
+        to_encode["type"] = "access"
 
     encoded_jwt = jwt.encode(
         to_encode,

@@ -11,7 +11,7 @@ test.describe('Admin - Départements', () => {
         await waitForLoading(page);
 
         // Vérifier le titre
-        await expect(page.locator('h1')).toContainText('Départements');
+        await expect(page.locator('h1.text-3xl')).toContainText('Départements');
 
         // Vérifier la présence du bouton ajouter
         await expect(page.locator('button', { hasText: 'Ajouter un département' })).toBeVisible();
@@ -25,9 +25,9 @@ test.describe('Admin - Départements', () => {
         await page.waitForSelector('table', { timeout: 10000 });
 
         // Vérifier que la table a des en-têtes
-        await expect(page.locator('th', { hasText: 'Code' })).toBeVisible();
-        await expect(page.locator('th', { hasText: 'Nom' })).toBeVisible();
-        await expect(page.locator('th', { hasText: 'Communes' })).toBeVisible();
+        await expect(page.locator('th', { hasText: 'Code' }).first()).toBeVisible();
+        await expect(page.locator('th', { hasText: 'Nom' }).first()).toBeVisible();
+        await expect(page.locator('th', { hasText: 'Communes' }).first()).toBeVisible();
     });
 
     test('devrait créer un nouveau département', async ({ page }) => {
@@ -57,6 +57,9 @@ test.describe('Admin - Départements', () => {
 
         // Vérifier que le département apparaît dans la liste
         await waitForLoading(page);
+        // Rechercher le département créé (il peut être sur une autre page)
+        await page.fill('input[placeholder*="Rechercher"]', uniqueNom);
+        await page.waitForTimeout(300);
         await expect(page.locator(`text=${uniqueNom}`)).toBeVisible();
     });
 
@@ -90,6 +93,10 @@ test.describe('Admin - Départements', () => {
         await page.fill('input[placeholder*="Ouest"]', uniqueNom);
         await page.click('button:has-text("Créer")');
         await waitForLoading(page);
+
+        // Rechercher le département créé (pagination possible)
+        await page.fill('input[placeholder*="Rechercher"]', uniqueNom);
+        await page.waitForTimeout(300);
 
         // Maintenant, modifier ce département
         const row = page.locator(`tr:has-text("${uniqueNom}")`);

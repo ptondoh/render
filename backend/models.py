@@ -49,7 +49,7 @@ class PyObjectId(str):
 class UserBase(BaseModel):
     """Modèle de base pour un utilisateur"""
     email: EmailStr = Field(..., description="Email de l'utilisateur")
-    roles: list[Literal["agent", "décideur", "bailleur"]] = Field(..., description="Rôles de l'utilisateur (peut avoir plusieurs rôles)")
+    roles: list[str] = Field(..., description="Liste des IDs de rôles de l'utilisateur")
     nom: Optional[str] = Field(None, description="Nom complet")
     prenom: Optional[str] = Field(None, description="Prénom")
     id_categorie_user: Optional[str] = Field(None, description="ID de la catégorie d'utilisateur")
@@ -57,6 +57,7 @@ class UserBase(BaseModel):
     departement_id: Optional[str] = Field(None, description="ID du département d'affectation")
     telephone: Optional[str] = Field(None, description="Numéro de téléphone")
     actif: bool = Field(True, description="Compte actif ou non")
+    two_fa_method: Optional[str] = Field("none", description="Méthode de 2e facteur: none, totp, email")
 
 
 class UserCreate(UserBase):
@@ -73,6 +74,7 @@ class UserInDB(UserBase):
     mfa_backup_codes: list[str] = []
     created_at: datetime
     updated_at: Optional[datetime] = None
+    role_names: Optional[list[str]] = None
 
     class Config:
         populate_by_name = True
@@ -84,9 +86,46 @@ class UserResponse(UserBase):
     id: PyObjectId
     mfa_enabled: bool
     created_at: datetime
+    role_names: Optional[list[str]] = Field(None, description="Noms des rôles (enrichi pour frontend)")
 
     class Config:
         populate_by_name = True
+
+
+class UserUpdate(BaseModel):
+    """Modèle pour mise à jour utilisateur (pas email/password)"""
+    roles: list[str] = Field(..., description="Liste des IDs de rôles de l'utilisateur")
+    nom: Optional[str] = Field(None, description="Nom complet")
+    prenom: Optional[str] = Field(None, description="Prénom")
+    departement_id: Optional[str] = Field(None, description="ID du département d'affectation")
+    telephone: Optional[str] = Field(None, description="Numéro de téléphone")
+    actif: bool = Field(True, description="Compte actif ou non")
+    two_fa_method: Optional[str] = Field(None, description="Réinitialiser la méthode 2FA (none, totp, email)")
+
+
+class UserListResponse(UserResponse):
+    """Réponse étendue pour liste admin avec enrichissement"""
+    updated_at: Optional[datetime] = None
+    departement_nom: Optional[str] = Field(None, description="Nom du département (enrichi)")
+
+
+class PasswordResetResponse(BaseModel):
+    """Réponse pour reset password"""
+    temporary_password: str = Field(..., description="Mot de passe temporaire généré")
+    message: str = Field(..., description="Message d'information")
+
+
+class ChangePasswordRequest(BaseModel):
+    """Requête de changement de mot de passe (propre compte)"""
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, description="Nouveau mot de passe (min 8 caractères)")
+
+
+class ProfileUpdateRequest(BaseModel):
+    """Requête de mise à jour du profil utilisateur (infos personnelles uniquement)"""
+    nom: Optional[str] = Field(None, max_length=100)
+    prenom: Optional[str] = Field(None, max_length=100)
+    telephone: Optional[str] = Field(None, max_length=20)
 
 
 # ============================================================================

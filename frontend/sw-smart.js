@@ -117,8 +117,10 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Ignorer les requêtes vers d'autres domaines (CDN, etc.)
-    if (url.origin !== location.origin && !url.pathname.startsWith('/api/')) {
+    // En mode ONLINE : ignorer toutes les requêtes cross-origin
+    // Le navigateur gère directement CORS sans interférence du SW
+    // En mode OFFLINE : n'intercepter que les requêtes API cross-origin
+    if (url.origin !== location.origin && (isOnline || !url.pathname.startsWith('/api/'))) {
         return;
     }
 

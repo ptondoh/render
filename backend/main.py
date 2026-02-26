@@ -26,7 +26,8 @@ from backend.routers import (
     collectes as collectes_router,
     alertes as alertes_router,
     import_collectes as import_collectes_router,
-    dashboard as dashboard_router
+    dashboard as dashboard_router,
+    users as users_router
 )
 
 # Configuration du logging
@@ -145,6 +146,7 @@ app.include_router(collectes_router.router)
 app.include_router(alertes_router.router)
 app.include_router(import_collectes_router.router)
 app.include_router(dashboard_router.router)
+app.include_router(users_router.router)
 
 
 # ============================================================================
@@ -155,8 +157,18 @@ app.include_router(dashboard_router.router)
 async def global_exception_handler(request: Request, exc: Exception):
     """
     Gestionnaire d'erreurs global pour capturer les exceptions non gérées.
+    Ajoute manuellement les headers CORS car Starlette ne les propage pas
+    toujours sur les réponses issues des exception_handler(Exception).
     """
     logger.error(f"Erreur non gérée: {exc}", exc_info=True)
+
+    # Ajouter manuellement les headers CORS pour que le navigateur
+    # puisse lire le message d'erreur (sinon il voit juste "CORS error")
+    origin = request.headers.get("origin", "")
+    headers = {}
+    if origin and origin in settings.cors_origins_list:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
 
     return JSONResponse(
         status_code=500,
@@ -164,7 +176,8 @@ async def global_exception_handler(request: Request, exc: Exception):
             "message": "Une erreur interne s'est produite",
             "detail": str(exc) if settings.is_development else "Contactez l'administrateur",
             "timestamp": datetime.utcnow().isoformat()
-        }
+        },
+        headers=headers
     )
 
 

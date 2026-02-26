@@ -11,7 +11,7 @@ test.describe('Admin - Communes', () => {
         await waitForLoading(page);
 
         // Vérifier le titre
-        await expect(page.locator('h1')).toContainText('Communes');
+        await expect(page.locator('h1.text-3xl')).toContainText('Communes');
 
         // Vérifier la présence du bouton ajouter
         await expect(page.locator('button', { hasText: 'Ajouter une commune' })).toBeVisible();
@@ -25,11 +25,11 @@ test.describe('Admin - Communes', () => {
         await page.waitForSelector('table', { timeout: 10000 });
 
         // Vérifier que la table a des en-têtes
-        await expect(page.locator('th', { hasText: 'Code' })).toBeVisible();
-        await expect(page.locator('th', { hasText: 'Nom' })).toBeVisible();
-        await expect(page.locator('th', { hasText: 'Département' })).toBeVisible();
-        await expect(page.locator('th', { hasText: 'Type Zone' })).toBeVisible();
-        await expect(page.locator('th', { hasText: 'Population' })).toBeVisible();
+        await expect(page.locator('th', { hasText: 'Code' }).first()).toBeVisible();
+        await expect(page.locator('th', { hasText: 'Nom' }).first()).toBeVisible();
+        await expect(page.locator('th', { hasText: 'Département' }).first()).toBeVisible();
+        await expect(page.locator('th', { hasText: 'Type Zone' }).first()).toBeVisible();
+        await expect(page.locator('th', { hasText: 'Population' }).first()).toBeVisible();
     });
 
     test('devrait créer une nouvelle commune', async ({ page }) => {
@@ -51,25 +51,29 @@ test.describe('Admin - Communes', () => {
         await page.fill('input[placeholder*="Port-au-Prince"]', uniqueNom);
         await page.fill('input[placeholder*="Pòtoprens"]', 'Test Komin');
 
-        // Sélectionner un département (le premier disponible)
-        const deptOptions = page.locator('select option').filter({ hasNotText: 'Sélectionner' });
+        // Sélectionner un département (le premier disponible) — scoper au modal
+        const modal = page.locator('.bg-white.rounded-lg.shadow-xl');
+        const deptOptions = modal.locator('select').first().locator('option').filter({ hasNotText: 'Sélectionner' });
         const firstDeptValue = await deptOptions.first().getAttribute('value');
-        await page.selectOption('select', firstDeptValue);
+        await modal.locator('select').first().selectOption(firstDeptValue);
 
-        // Sélectionner type zone
-        await page.selectOption('select', 'urbaine');
+        // Sélectionner type zone (2ème select dans le modal)
+        await modal.locator('select').nth(1).selectOption('urbaine');
 
         // Ajouter population
         await page.fill('input[type="number"]', '50000');
 
         // Soumettre le formulaire
-        await page.click('button:has-text("Créer")');
+        await modal.locator('button:has-text("Créer")').click();
 
         // Vérifier le toast de succès
         await expectSuccessToast(page, 'créée avec succès');
 
         // Vérifier que la commune apparaît dans la liste
         await waitForLoading(page);
+        // Rechercher la commune créée (elle peut être sur une autre page)
+        await page.fill('input[placeholder*="Rechercher"]', uniqueNom);
+        await page.waitForTimeout(300);
         await expect(page.locator(`text=${uniqueNom}`)).toBeVisible();
     });
 
@@ -130,13 +134,18 @@ test.describe('Admin - Communes', () => {
         await page.fill('input[placeholder*="HT-"]', uniqueCode);
         await page.fill('input[placeholder*="Port-au-Prince"]', uniqueNom);
 
-        // Sélectionner un département
-        const deptOptions = page.locator('select option').filter({ hasNotText: 'Sélectionner' });
+        // Sélectionner un département — scoper au modal
+        const createModal = page.locator('.bg-white.rounded-lg.shadow-xl');
+        const deptOptions = createModal.locator('select').first().locator('option').filter({ hasNotText: 'Sélectionner' });
         const firstDeptValue = await deptOptions.first().getAttribute('value');
-        await page.selectOption('select', firstDeptValue);
+        await createModal.locator('select').first().selectOption(firstDeptValue);
 
-        await page.click('button:has-text("Créer")');
+        await createModal.locator('button:has-text("Créer")').click();
         await waitForLoading(page);
+
+        // Rechercher la commune créée (pagination possible)
+        await page.fill('input[placeholder*="Rechercher"]', uniqueNom);
+        await page.waitForTimeout(300);
 
         // Maintenant, modifier cette commune
         const row = page.locator(`tr:has-text("${uniqueNom}")`);
@@ -204,16 +213,21 @@ test.describe('Admin - Communes', () => {
         await page.fill('input[placeholder*="HT-"]', uniqueCode);
         await page.fill('input[placeholder*="Port-au-Prince"]', uniqueNom);
 
-        // Sélectionner un département
-        const deptOptions = page.locator('select option').filter({ hasNotText: 'Sélectionner' });
+        // Sélectionner un département — scoper au modal
+        const popModal = page.locator('.bg-white.rounded-lg.shadow-xl');
+        const deptOptions = popModal.locator('select').first().locator('option').filter({ hasNotText: 'Sélectionner' });
         const firstDeptValue = await deptOptions.first().getAttribute('value');
-        await page.selectOption('select', firstDeptValue);
+        await popModal.locator('select').first().selectOption(firstDeptValue);
 
         // Ajouter une grande population
         await page.fill('input[type="number"]', '1234567');
 
-        await page.click('button:has-text("Créer")');
+        await popModal.locator('button:has-text("Créer")').click();
         await waitForLoading(page);
+
+        // Rechercher la commune créée (pagination possible)
+        await page.fill('input[placeholder*="Rechercher"]', uniqueNom);
+        await page.waitForTimeout(300);
 
         // Vérifier que la population est formatée avec des séparateurs (ex: 1 234 567)
         const row = page.locator(`tr:has-text("${uniqueNom}")`);
@@ -225,7 +239,7 @@ test.describe('Admin - Communes', () => {
         await waitForLoading(page);
 
         // Changer le nombre d'items par page
-        const perPageSelect = page.locator('select').filter({ hasText: /Par page/i }).locator('..').locator('select');
+        const perPageSelect = page.locator('text=Par page:').locator('..').locator('select');
         await perPageSelect.selectOption('5');
 
         // Attendre le re-rendu

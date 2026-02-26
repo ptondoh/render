@@ -13,10 +13,10 @@ export default function AdminCommunesPage() {
     container.className = 'space-y-6';
 
     const user = auth.getCurrentUser();
-    const isBailleur = auth.hasRole('bailleur');
+    const hasAccess = auth.hasRole('bailleur') || auth.hasRole('décideur');
 
     // Vérifier les permissions
-    if (!isBailleur) {
+    if (!hasAccess) {
         const unauthorized = document.createElement('div');
         unauthorized.className = 'text-center py-12';
         unauthorized.innerHTML = `
@@ -634,10 +634,10 @@ export default function AdminCommunesPage() {
 
     async function handleDelete(commune) {
         if (commune.nombre_marches > 0) {
-            showToast(
-                `Impossible de supprimer : ${commune.nombre_marches} marché(s) sont liés à cette commune`,
-                'error'
-            );
+            showToast({
+                message: `Impossible de supprimer : ${commune.nombre_marches} marché(s) sont liés à cette commune`,
+                type: 'error'
+            });
             return;
         }
 
@@ -647,17 +647,17 @@ export default function AdminCommunesPage() {
 
         try {
             await api.delete(`/api/communes/${commune.id}`);
-            showToast('Commune supprimée avec succès', 'success');
+            showToast({ message: 'Commune supprimée avec succès', type: 'success' });
             await loadCommunes();
         } catch (error) {
-            showToast(error.message || 'Erreur lors de la suppression', 'error');
+            showToast({ message: error.message || 'Erreur lors de la suppression', type: 'error' });
         }
     }
 
     async function handleSave() {
         // Validation
         if (!formData.code || !formData.nom || !formData.departement_id || !formData.type_zone) {
-            showToast('Veuillez remplir tous les champs obligatoires', 'error');
+            showToast({ message: 'Veuillez remplir tous les champs obligatoires', type: 'error' });
             return;
         }
 
@@ -675,17 +675,17 @@ export default function AdminCommunesPage() {
             if (editingCommune) {
                 // Mise à jour
                 await api.put(`/api/communes/${editingCommune.id}`, dataToSend);
-                showToast('Commune mise à jour avec succès', 'success');
+                showToast({ message: 'Commune mise à jour avec succès', type: 'success' });
             } else {
                 // Création
                 await api.post('/api/communes', dataToSend);
-                showToast('Commune créée avec succès', 'success');
+                showToast({ message: 'Commune créée avec succès', type: 'success' });
             }
 
             showModal = false;
             await loadCommunes();
         } catch (error) {
-            showToast(error.message || 'Erreur lors de la sauvegarde', 'error');
+            showToast({ message: error.message || 'Erreur lors de la sauvegarde', type: 'error' });
         }
     }
 
@@ -708,7 +708,7 @@ export default function AdminCommunesPage() {
             communes = response;
             filterCommunes();
         } catch (error) {
-            showToast(error.message || 'Erreur lors du chargement des communes', 'error');
+            showToast({ message: error.message || 'Erreur lors du chargement des communes', type: 'error' });
             communes = [];
             filteredCommunes = [];
         } finally {

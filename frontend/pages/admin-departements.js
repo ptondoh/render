@@ -12,10 +12,10 @@ export default function AdminDepartementsPage() {
     container.className = 'space-y-6';
 
     const user = auth.getCurrentUser();
-    const isBailleur = auth.hasRole('bailleur');
+    const hasAccess = auth.hasRole('bailleur') || auth.hasRole('décideur');
 
     // Vérifier les permissions
-    if (!isBailleur) {
+    if (!hasAccess) {
         const unauthorized = document.createElement('div');
         unauthorized.className = 'text-center py-12';
         unauthorized.innerHTML = `
@@ -489,10 +489,10 @@ export default function AdminDepartementsPage() {
 
     async function handleDelete(dept) {
         if (dept.nombre_communes > 0) {
-            showToast(
-                `Impossible de supprimer : ${dept.nombre_communes} commune(s) sont liées à ce département`,
-                'error'
-            );
+            showToast({
+                message: `Impossible de supprimer : ${dept.nombre_communes} commune(s) sont liées à ce département`,
+                type: 'error'
+            });
             return;
         }
 
@@ -502,17 +502,17 @@ export default function AdminDepartementsPage() {
 
         try {
             await api.delete(`/api/departements/${dept.id}`);
-            showToast('Département supprimé avec succès', 'success');
+            showToast({ message: 'Département supprimé avec succès', type: 'success' });
             await loadDepartements();
         } catch (error) {
-            showToast(error.message || 'Erreur lors de la suppression', 'error');
+            showToast({ message: error.message || 'Erreur lors de la suppression', type: 'error' });
         }
     }
 
     async function handleSave() {
         // Validation
         if (!formData.code || !formData.nom) {
-            showToast('Veuillez remplir tous les champs obligatoires', 'error');
+            showToast({ message: 'Veuillez remplir tous les champs obligatoires', type: 'error' });
             return;
         }
 
@@ -520,17 +520,17 @@ export default function AdminDepartementsPage() {
             if (editingDepartement) {
                 // Mise à jour
                 await api.put(`/api/departements/${editingDepartement.id}`, formData);
-                showToast('Département mis à jour avec succès', 'success');
+                showToast({ message: 'Département mis à jour avec succès', type: 'success' });
             } else {
                 // Création
                 await api.post('/api/departements', formData);
-                showToast('Département créé avec succès', 'success');
+                showToast({ message: 'Département créé avec succès', type: 'success' });
             }
 
             showModal = false;
             await loadDepartements();
         } catch (error) {
-            showToast(error.message || 'Erreur lors de la sauvegarde', 'error');
+            showToast({ message: error.message || 'Erreur lors de la sauvegarde', type: 'error' });
         }
     }
 
@@ -544,7 +544,7 @@ export default function AdminDepartementsPage() {
             departements = response;
             filterDepartements();
         } catch (error) {
-            showToast(error.message || 'Erreur lors du chargement des départements', 'error');
+            showToast({ message: error.message || 'Erreur lors du chargement des départements', type: 'error' });
             departements = [];
             filteredDepartements = [];
         } finally {

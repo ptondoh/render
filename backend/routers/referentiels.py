@@ -17,7 +17,7 @@ from backend.models import (
     MessageResponse
 )
 from backend.middleware.security import get_current_user
-from backend.middleware.rbac import require_role
+from backend.middleware.rbac import require_role, require_permission
 from backend.database import db
 
 router = APIRouter(prefix="/api", tags=["Référentiels"])
@@ -51,7 +51,7 @@ async def get_unites_mesure(current_user: dict = Depends(get_current_user)):
 )
 async def create_unite_mesure(
     unite: UniteMesureCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:manage"))
 ):
     """
     Créer une nouvelle unité de mesure.
@@ -87,7 +87,7 @@ async def create_unite_mesure(
 async def update_unite_mesure(
     unite_id: str,
     unite: UniteMesureCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:manage"))
 ):
     """
     Mettre à jour une unité de mesure.
@@ -142,7 +142,7 @@ async def update_unite_mesure(
 @router.delete("/unites-mesure/{unite_id}", response_model=MessageResponse)
 async def delete_unite_mesure(
     unite_id: str,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:manage"))
 ):
     """
     Supprimer une unité de mesure.
@@ -205,7 +205,7 @@ async def get_categories_produit(current_user: dict = Depends(get_current_user))
 )
 async def create_categorie_produit(
     categorie: CategorieProduitCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:manage"))
 ):
     """
     Créer une nouvelle catégorie de produit.
@@ -237,7 +237,7 @@ async def create_categorie_produit(
 async def update_categorie_produit(
     categorie_id: str,
     categorie: CategorieProduitCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:manage"))
 ):
     """
     Mettre à jour une catégorie de produit.
@@ -290,7 +290,7 @@ async def update_categorie_produit(
 @router.delete("/categories-produit/{categorie_id}", response_model=MessageResponse)
 async def delete_categorie_produit(
     categorie_id: str,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:manage"))
 ):
     """
     Supprimer une catégorie de produit.
@@ -352,7 +352,7 @@ async def get_categories_user(current_user: dict = Depends(get_current_user)):
 )
 async def create_categorie_user(
     categorie: CategorieUserCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:manage"))
 ):
     """
     Créer une nouvelle catégorie d'utilisateur.
@@ -383,10 +383,10 @@ async def create_categorie_user(
 # ============================================================================
 
 @router.get("/permissions", response_model=List[PermissionResponse])
-async def get_permissions(current_user: dict = Depends(require_role(["décideur"]))):
+async def get_permissions(current_user: dict = Depends(require_permission("admin:permissions:read"))):
     """
     Liste toutes les permissions.
-    Réservé aux décideurs.
+    Accès via permission admin:permissions:read.
     """
     permissions = await db.permissions.find().to_list(None)
     return [
@@ -407,11 +407,11 @@ async def get_permissions(current_user: dict = Depends(require_role(["décideur"
 )
 async def create_permission(
     permission: PermissionCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:permissions:create"))
 ):
     """
     Créer une nouvelle permission.
-    Réservé aux décideurs.
+    Accès via permission admin:permissions:create.
     """
     existing = await db.permissions.find_one({
         "nom": permission.nom,
@@ -442,10 +442,10 @@ async def create_permission(
 # ============================================================================
 
 @router.get("/roles", response_model=List[RoleResponse])
-async def get_roles(current_user: dict = Depends(require_role(["décideur"]))):
+async def get_roles(current_user: dict = Depends(require_permission("admin:roles:read"))):
     """
     Liste tous les rôles avec leurs permissions.
-    Réservé aux décideurs.
+    Accès via permission admin:roles:read.
     """
     roles = await db.roles.find().to_list(None)
     result = []
@@ -487,11 +487,11 @@ async def get_roles(current_user: dict = Depends(require_role(["décideur"]))):
 )
 async def create_role(
     role: RoleCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:roles:create"))
 ):
     """
     Créer un nouveau rôle.
-    Réservé aux décideurs.
+    Accès via permission admin:roles:create.
     """
     existing = await db.roles.find_one({"nom": role.nom})
     if existing:
@@ -538,4 +538,225 @@ async def create_role(
         id_permissions=created_role.get("id_permissions", []),
         description=created_role.get("description"),
         permissions=permissions_list
+    )
+
+
+@router.put("/roles/{role_id}", response_model=RoleResponse)
+async def update_role(
+    role_id: str,
+    role_data: RoleCreate,
+    current_user: dict = Depends(require_permission("admin:roles:update"))
+):
+    """
+    Modifier un rôle existant.
+    Accès via permission admin:roles:update.
+    """
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(role_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID de rôle invalide"
+        )
+
+    # Vérifier que le rôle existe
+    existing = await db.roles.find_one({"_id": ObjectId(role_id)})
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Rôle avec ID {role_id} introuvable"
+        )
+
+    # Vérifier unicité du nom (si changé)
+    if role_data.nom != existing.get("nom"):
+        name_exists = await db.roles.find_one({"nom": role_data.nom})
+        if name_exists:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Le rôle '{role_data.nom}' existe déjà"
+            )
+
+    # Vérifier que les permissions existent
+    if role_data.id_permissions:
+        perm_ids = [ObjectId(pid) for pid in role_data.id_permissions if ObjectId.is_valid(pid)]
+        perm_count = await db.permissions.count_documents({"_id": {"$in": perm_ids}})
+        if perm_count != len(role_data.id_permissions):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Une ou plusieurs permissions n'existent pas"
+            )
+
+    # Mettre à jour
+    role_dict = role_data.model_dump()
+    role_dict["updated_at"] = datetime.utcnow()
+
+    await db.roles.update_one(
+        {"_id": ObjectId(role_id)},
+        {"$set": role_dict}
+    )
+
+    # Récupérer le rôle mis à jour
+    updated_role = await db.roles.find_one({"_id": ObjectId(role_id)})
+
+    # Récupérer les permissions
+    permissions_list = []
+    if updated_role.get("id_permissions"):
+        perm_ids = [ObjectId(pid) for pid in updated_role["id_permissions"] if ObjectId.is_valid(pid)]
+        permissions = await db.permissions.find({"_id": {"$in": perm_ids}}).to_list(None)
+        permissions_list = [
+            PermissionResponse(
+                id=str(perm["_id"]),
+                nom=perm["nom"],
+                action=perm["action"],
+                description=perm.get("description")
+            )
+            for perm in permissions
+        ]
+
+    return RoleResponse(
+        id=str(updated_role["_id"]),
+        nom=updated_role["nom"],
+        id_permissions=updated_role.get("id_permissions", []),
+        description=updated_role.get("description"),
+        permissions=permissions_list
+    )
+
+
+@router.delete("/roles/{role_id}", response_model=MessageResponse)
+async def delete_role(
+    role_id: str,
+    current_user: dict = Depends(require_permission("admin:roles:delete"))
+):
+    """
+    Supprimer un rôle.
+    Accès via permission admin:roles:delete.
+    """
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(role_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID de rôle invalide"
+        )
+
+    # Vérifier que le rôle existe
+    role = await db.roles.find_one({"_id": ObjectId(role_id)})
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Rôle avec ID {role_id} introuvable"
+        )
+
+    # Vérifier qu'aucun utilisateur n'a ce rôle
+    users_with_role = await db.users.count_documents({"roles": role_id})
+    if users_with_role > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Impossible de supprimer le rôle '{role['nom']}': {users_with_role} utilisateur(s) l'utilisent encore"
+        )
+
+    # Supprimer le rôle
+    await db.roles.delete_one({"_id": ObjectId(role_id)})
+
+    return MessageResponse(
+        message=f"Rôle '{role['nom']}' supprimé avec succès"
+    )
+
+
+@router.put("/permissions/{permission_id}", response_model=PermissionResponse)
+async def update_permission(
+    permission_id: str,
+    permission_data: PermissionCreate,
+    current_user: dict = Depends(require_permission("admin:permissions:update"))
+):
+    """
+    Modifier une permission existante.
+    Réservé aux décideurs (bientôt: require_permission("admin:permissions:update")).
+    """
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(permission_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID de permission invalide"
+        )
+
+    # Vérifier que la permission existe
+    existing = await db.permissions.find_one({"_id": ObjectId(permission_id)})
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Permission avec ID {permission_id} introuvable"
+        )
+
+    # Vérifier unicité (nom + action)
+    name_exists = await db.permissions.find_one({
+        "nom": permission_data.nom,
+        "action": permission_data.action,
+        "_id": {"$ne": ObjectId(permission_id)}
+    })
+    if name_exists:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"La permission '{permission_data.nom}:{permission_data.action}' existe déjà"
+        )
+
+    # Mettre à jour
+    perm_dict = permission_data.model_dump()
+    perm_dict["updated_at"] = datetime.utcnow()
+
+    await db.permissions.update_one(
+        {"_id": ObjectId(permission_id)},
+        {"$set": perm_dict}
+    )
+
+    # Récupérer la permission mise à jour
+    updated_perm = await db.permissions.find_one({"_id": ObjectId(permission_id)})
+
+    return PermissionResponse(
+        id=str(updated_perm["_id"]),
+        nom=updated_perm["nom"],
+        action=updated_perm["action"],
+        description=updated_perm.get("description")
+    )
+
+
+@router.delete("/permissions/{permission_id}", response_model=MessageResponse)
+async def delete_permission(
+    permission_id: str,
+    current_user: dict = Depends(require_permission("admin:permissions:delete"))
+):
+    """
+    Supprimer une permission.
+    Réservé aux décideurs (bientôt: require_permission("admin:permissions:delete")).
+    """
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(permission_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID de permission invalide"
+        )
+
+    # Vérifier que la permission existe
+    permission = await db.permissions.find_one({"_id": ObjectId(permission_id)})
+    if not permission:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Permission avec ID {permission_id} introuvable"
+        )
+
+    # Vérifier qu'aucun rôle n'utilise cette permission
+    roles_with_perm = await db.roles.count_documents({"id_permissions": permission_id})
+    if roles_with_perm > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Impossible de supprimer la permission '{permission['nom']}': {roles_with_perm} rôle(s) l'utilisent encore"
+        )
+
+    # Supprimer la permission
+    await db.permissions.delete_one({"_id": ObjectId(permission_id)})
+
+    return MessageResponse(
+        message=f"Permission '{permission['nom']}' supprimée avec succès"
     )

@@ -32,7 +32,7 @@ export async function loginAsDecideur(page) {
  * @param {string} message
  */
 export async function expectSuccessToast(page, message) {
-    const toast = page.locator('.bg-green-50, .bg-green-100').filter({ hasText: message });
+    const toast = page.locator('.bg-green-500').filter({ hasText: message });
     await toast.waitFor({ state: 'visible', timeout: 5000 });
 }
 
@@ -42,7 +42,7 @@ export async function expectSuccessToast(page, message) {
  * @param {string} message
  */
 export async function expectErrorToast(page, message) {
-    const toast = page.locator('.bg-red-50, .bg-red-100').filter({ hasText: message });
+    const toast = page.locator('.bg-red-500').filter({ hasText: message });
     await toast.waitFor({ state: 'visible', timeout: 5000 });
 }
 

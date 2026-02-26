@@ -23,6 +23,22 @@ class AuthManager {
         if (userJson) {
             try {
                 this.user = JSON.parse(userJson);
+
+                // Vérifier si l'utilisateur a role_names (nouveau format après migration RBAC)
+                // Si non, forcer la reconnexion pour obtenir le nouveau format
+                if (this.user && !this.user.role_names) {
+                    console.warn('[AUTH] Format utilisateur obsolète détecté (pas de role_names). Déconnexion forcée.');
+                    this.clearAuth();
+
+                    // Afficher un message à l'utilisateur
+                    if (window.location.hash !== '#/login') {
+                        showToast({
+                            message: 'Veuillez vous reconnecter suite à une mise à jour du système',
+                            type: 'warning'
+                        });
+                        window.location.hash = '#/login';
+                    }
+                }
             } catch (error) {
                 console.error('Erreur lors du chargement de l\'utilisateur:', error);
                 this.clearAuth();
@@ -51,6 +67,7 @@ class AuthManager {
                     success: true,
                     mfa_required: true,
                     temp_token: response.temp_token,
+                    mfa_method: response.mfa_method || 'totp',
                 };
             }
 
@@ -181,14 +198,20 @@ class AuthManager {
      * Vérifier si l'utilisateur a un rôle spécifique
      */
     hasRole(role) {
-        return this.user && this.user.roles && this.user.roles.includes(role);
+        // Utiliser role_names si disponible (après migration BDD)
+        // Sinon fallback sur roles pour compatibilité
+        const roleList = this.user?.role_names || this.user?.roles || [];
+        return roleList.includes(role);
     }
 
     /**
      * Vérifier si l'utilisateur a l'un des rôles spécifiés
      */
     hasAnyRole(roles) {
-        return this.user && this.user.roles && roles.some(role => this.user.roles.includes(role));
+        // Utiliser role_names si disponible (après migration BDD)
+        // Sinon fallback sur roles pour compatibilité
+        const roleList = this.user?.role_names || this.user?.roles || [];
+        return roles.some(role => roleList.includes(role));
     }
 
     /**

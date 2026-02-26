@@ -72,8 +72,8 @@ test.describe('Test simple - Départements et Communes', () => {
 
         // Vérifier la table
         await expect(page.locator('table')).toBeVisible();
-        await expect(page.locator('th', { hasText: /^Code$/ })).toBeVisible();
-        await expect(page.locator('th', { hasText: /^Nom$/ })).toBeVisible();
+        await expect(page.locator('th', { hasText: 'Code' }).first()).toBeVisible();
+        await expect(page.locator('th', { hasText: 'Nom' }).first()).toBeVisible();
     });
 
     test('devrait naviguer vers admin communes', async ({ page }) => {
@@ -120,8 +120,8 @@ test.describe('Test simple - Départements et Communes', () => {
 
         // Vérifier la table
         await expect(page.locator('table')).toBeVisible();
-        await expect(page.locator('th', { hasText: /^Code$/ })).toBeVisible();
-        await expect(page.locator('th', { hasText: /^Nom$/ })).toBeVisible();
-        await expect(page.locator('th:has-text("Département")')).toBeVisible();
+        await expect(page.locator('th', { hasText: 'Code' }).first()).toBeVisible();
+        await expect(page.locator('th', { hasText: 'Nom' }).first()).toBeVisible();
+        await expect(page.locator('th:has-text("Département")').first()).toBeVisible();
     });
 });

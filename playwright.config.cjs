@@ -1,10 +1,6 @@
-import { defineConfig, devices } from '@playwright/test';
+const { defineConfig, devices } = require('@playwright/test');
 
-/**
- * Configuration Playwright pour tests E2E
- * @see https://playwright.dev/docs/test-configuration
- */
-export default defineConfig({
+module.exports = defineConfig({
   testDir: './tests',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
@@ -16,6 +12,7 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
   },
 
   projects: [
@@ -25,11 +22,10 @@ export default defineConfig({
     },
   ],
 
-  /* Run local dev server before starting tests */
   webServer: {
-    command: 'npm run serve',
+    command: 'cd frontend && npx http-server -p 3000',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
-    timeout: 120000,
+    timeout: 120 * 1000,
   },
 });
