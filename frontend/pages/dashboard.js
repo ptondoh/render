@@ -297,27 +297,27 @@ export default function DashboardPage() {
 
         content.appendChild(sectionTitle);
 
-        // Helper tuile compacte (4 par ligne)
+        // Helper tuile (même style que l'original : titre → icône → description)
         function renderTile(icon, title, desc, href) {
             const card = document.createElement('div');
             card.className = 'bg-white rounded-lg shadow-md border border-gray-200 p-5 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all';
             card.setAttribute('data-tile', title);
             card.onclick = () => window.location.hash = href;
 
-            const iconEl = document.createElement('p');
-            iconEl.className = 'text-2xl mb-2';
-            iconEl.textContent = icon;
-
             const titleEl = document.createElement('h3');
-            titleEl.className = 'text-sm font-medium text-gray-700 mb-1';
+            titleEl.className = 'text-sm font-medium text-gray-600 mb-2';
             titleEl.textContent = title;
 
+            const iconEl = document.createElement('p');
+            iconEl.className = 'text-3xl font-bold mb-2 text-blue-600';
+            iconEl.textContent = icon;
+
             const descEl = document.createElement('p');
-            descEl.className = 'text-xs text-gray-500';
+            descEl.className = 'text-sm text-gray-500';
             descEl.textContent = desc;
 
-            card.appendChild(iconEl);
             card.appendChild(titleEl);
+            card.appendChild(iconEl);
             card.appendChild(descEl);
 
             return card;
