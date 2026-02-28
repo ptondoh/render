@@ -168,13 +168,14 @@ class ApiClient {
     }
 
     /**
-     * Méthode DELETE
+     * Méthode DELETE (avec body optionnel pour les suppressions en lot)
      */
-    async delete(endpoint, options = {}) {
-        return this.request(endpoint, {
-            ...options,
-            method: 'DELETE',
-        });
+    async delete(endpoint, data = null, options = {}) {
+        const config = { ...options, method: 'DELETE' };
+        if (data !== null) {
+            config.body = JSON.stringify(data);
+        }
+        return this.request(endpoint, config);
     }
 }
 

@@ -43,6 +43,9 @@ export default function AdminPermissionsPage() {
     let itemsPerPage = 20;
     let totalPages = 1;
 
+    // Sélection (suppression en lot)
+    let selectedIds = new Set();
+
     // Formulaire
     let formData = {
         nom: '',
@@ -69,6 +72,18 @@ export default function AdminPermissionsPage() {
         titleDiv.appendChild(title);
         titleDiv.appendChild(subtitle);
 
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'flex items-center gap-3';
+
+        if (selectedIds.size > 0) {
+            const bulkDeleteBtn = Button({
+                text: `Supprimer la sélection (${selectedIds.size})`,
+                variant: 'danger',
+                onClick: handleBulkDelete
+            });
+            buttonsDiv.appendChild(bulkDeleteBtn);
+        }
+
         const addButton = Button({
             text: '+ Ajouter une permission',
             variant: 'primary',
@@ -84,8 +99,9 @@ export default function AdminPermissionsPage() {
             }
         });
 
+        buttonsDiv.appendChild(addButton);
         header.appendChild(titleDiv);
-        header.appendChild(addButton);
+        header.appendChild(buttonsDiv);
 
         return header;
     }
@@ -288,6 +304,26 @@ export default function AdminPermissionsPage() {
                         return th;
                     };
 
+                    // Checkbox "tout sélectionner"
+                    const checkAllTh = document.createElement('th');
+                    checkAllTh.className = 'px-4 py-3 w-10';
+                    const checkAll = document.createElement('input');
+                    checkAll.type = 'checkbox';
+                    checkAll.className = 'w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer';
+                    const pageIds = paginatedPermissions.map(p => p.id);
+                    checkAll.checked = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+                    checkAll.indeterminate = pageIds.some(id => selectedIds.has(id)) && !checkAll.checked;
+                    checkAll.addEventListener('change', () => {
+                        if (checkAll.checked) {
+                            pageIds.forEach(id => selectedIds.add(id));
+                        } else {
+                            pageIds.forEach(id => selectedIds.delete(id));
+                        }
+                        render();
+                    });
+                    checkAllTh.appendChild(checkAll);
+                    headerRow.appendChild(checkAllTh);
+
                     // En-têtes triables
                     headerRow.appendChild(createSortableHeader('Nom', 'nom'));
                     headerRow.appendChild(createSortableHeader('Action', 'action'));
@@ -308,7 +344,27 @@ export default function AdminPermissionsPage() {
 
                     paginatedPermissions.forEach(permission => {
                         const row = document.createElement('tr');
-                        row.className = 'hover:bg-gray-50';
+                        row.className = selectedIds.has(permission.id)
+                            ? 'bg-blue-50'
+                            : 'hover:bg-gray-50';
+
+                        // Checkbox de sélection
+                        const checkCell = document.createElement('td');
+                        checkCell.className = 'px-4 py-4 w-10';
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer';
+                        checkbox.checked = selectedIds.has(permission.id);
+                        checkbox.addEventListener('change', () => {
+                            if (checkbox.checked) {
+                                selectedIds.add(permission.id);
+                            } else {
+                                selectedIds.delete(permission.id);
+                            }
+                            render();
+                        });
+                        checkCell.appendChild(checkbox);
+                        row.appendChild(checkCell);
 
                         // Nom
                         const nomCell = document.createElement('td');
@@ -505,6 +561,32 @@ export default function AdminPermissionsPage() {
         } catch (error) {
             showToast({
                 message: error.message || 'Erreur lors de la suppression',
+                type: 'error'
+            });
+        }
+    }
+
+    async function handleBulkDelete() {
+        const count = selectedIds.size;
+        if (!confirm(`Êtes-vous sûr de vouloir supprimer ${count} permission(s) sélectionnée(s) ?\n\nLes permissions utilisées par des rôles seront ignorées.`)) {
+            return;
+        }
+
+        try {
+            const result = await api.delete('/api/permissions', { ids: Array.from(selectedIds) });
+            const msg = result.message || `${result.deleted_count} permission(s) supprimée(s)`;
+            showToast({ message: msg, type: result.deleted_count > 0 ? 'success' : 'warning' });
+            if (result.skipped_roles && result.skipped_roles.length > 0) {
+                showToast({
+                    message: `Ignorées (utilisées par des rôles) : ${result.skipped_roles.join(', ')}`,
+                    type: 'warning'
+                });
+            }
+            selectedIds.clear();
+            await loadPermissions();
+        } catch (error) {
+            showToast({
+                message: error.message || 'Erreur lors de la suppression en lot',
                 type: 'error'
             });
         }

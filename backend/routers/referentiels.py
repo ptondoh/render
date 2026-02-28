@@ -5,8 +5,9 @@ Accès protégé par authentification JWT et RBAC.
 # Auto-reload trigger
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List
+from typing import List, Optional
 from datetime import datetime
+from pydantic import BaseModel
 
 from backend.models import (
     UniteMesureCreate, UniteMesureResponse,
@@ -16,6 +17,9 @@ from backend.models import (
     RoleCreate, RoleResponse,
     MessageResponse
 )
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[str]
 from backend.middleware.security import get_current_user
 from backend.middleware.rbac import require_role, require_permission
 from backend.database import db
@@ -760,3 +764,54 @@ async def delete_permission(
     return MessageResponse(
         message=f"Permission '{permission['nom']}' supprimée avec succès"
     )
+
+
+@router.delete("/permissions", response_model=dict)
+async def bulk_delete_permissions(
+    body: BulkDeleteRequest,
+    current_user: dict = Depends(require_permission("admin:permissions:delete"))
+):
+    """
+    Supprimer plusieurs permissions en une seule requête.
+    Retourne un résumé : supprimées, ignorées (utilisées par des rôles), introuvables.
+    """
+    from bson import ObjectId
+
+    if not body.ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La liste des IDs est vide"
+        )
+
+    deleted = []
+    skipped_roles = []
+    not_found = []
+
+    for permission_id in body.ids:
+        if not ObjectId.is_valid(permission_id):
+            not_found.append(permission_id)
+            continue
+
+        permission = await db.permissions.find_one({"_id": ObjectId(permission_id)})
+        if not permission:
+            not_found.append(permission_id)
+            continue
+
+        # Vérifier qu'aucun rôle n'utilise cette permission
+        roles_with_perm = await db.roles.count_documents({"id_permissions": permission_id})
+        if roles_with_perm > 0:
+            skipped_roles.append(permission["nom"])
+            continue
+
+        await db.permissions.delete_one({"_id": ObjectId(permission_id)})
+        deleted.append(permission["nom"])
+
+    return {
+        "deleted_count": len(deleted),
+        "skipped_count": len(skipped_roles),
+        "not_found_count": len(not_found),
+        "deleted": deleted,
+        "skipped_roles": skipped_roles,
+        "message": f"{len(deleted)} permission(s) supprimée(s)"
+            + (f", {len(skipped_roles)} ignorée(s) (utilisées par des rôles)" if skipped_roles else "")
+    }
