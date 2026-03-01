@@ -13,7 +13,7 @@ from backend.models import (
     MessageResponse
 )
 from backend.middleware.security import get_current_user
-from backend.middleware.rbac import require_role
+from backend.middleware.rbac import require_role, require_permission
 from backend.database import db
 
 router = APIRouter(prefix="/api/marches", tags=["Marchés"])
@@ -150,7 +150,7 @@ async def get_marche(
 )
 async def create_marche(
     marche: MarcheCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("marches:create"))
 ):
     """
     Créer un nouveau marché.
@@ -224,7 +224,7 @@ async def create_marche(
 async def update_marche(
     marche_id: str,
     marche: MarcheCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("marches:update"))
 ):
     """
     Mettre à jour un marché.
@@ -318,7 +318,7 @@ async def update_marche(
 @router.delete("/{marche_id}", response_model=MessageResponse)
 async def delete_marche(
     marche_id: str,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("marches:delete"))
 ):
     """
     Supprimer (désactiver) un marché.

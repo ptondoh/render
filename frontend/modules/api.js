@@ -167,6 +167,14 @@ class ApiClient {
         });
     }
 
+    async patch(endpoint, data = null, options = {}) {
+        const config = { ...options, method: 'PATCH' };
+        if (data !== null) {
+            config.body = JSON.stringify(data);
+        }
+        return this.request(endpoint, config);
+    }
+
     /**
      * Méthode DELETE (avec body optionnel pour les suppressions en lot)
      */

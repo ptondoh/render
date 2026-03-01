@@ -44,6 +44,9 @@ export default function AdminMarchesPage() {
     let itemsPerPage = 10;
     let totalPages = 1;
 
+    // Sélection (suppression en lot)
+    let selectedIds = new Set();
+
     // Formulaire
     let formData = {
         nom: '',
@@ -76,6 +79,18 @@ export default function AdminMarchesPage() {
         titleDiv.appendChild(title);
         titleDiv.appendChild(subtitle);
 
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'flex items-center gap-3';
+
+        if (selectedIds.size > 0) {
+            const bulkDeleteBtn = Button({
+                text: `Supprimer la sélection (${selectedIds.size})`,
+                variant: 'danger',
+                onClick: handleBulkDelete
+            });
+            buttonsDiv.appendChild(bulkDeleteBtn);
+        }
+
         const addButton = Button({
             text: '+ Ajouter un marché',
             variant: 'primary',
@@ -99,8 +114,9 @@ export default function AdminMarchesPage() {
             }
         });
 
+        buttonsDiv.appendChild(addButton);
         header.appendChild(titleDiv);
-        header.appendChild(addButton);
+        header.appendChild(buttonsDiv);
 
         return header;
     }
@@ -184,6 +200,29 @@ export default function AdminMarchesPage() {
                         return th;
                     };
 
+                    // Checkbox "tout sélectionner"
+                    const checkAllTh = document.createElement('th');
+                    checkAllTh.className = 'px-4 py-3 w-10';
+                    const checkAll = document.createElement('input');
+                    checkAll.type = 'checkbox';
+                    checkAll.className = 'w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer';
+                    const startIndex = (currentPage - 1) * itemsPerPage;
+                    const endIndex = startIndex + itemsPerPage;
+                    const pageItems = filteredMarches.slice(startIndex, endIndex);
+                    const pageIds = pageItems.map(m => m.id);
+                    checkAll.checked = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+                    checkAll.indeterminate = pageIds.some(id => selectedIds.has(id)) && !checkAll.checked;
+                    checkAll.addEventListener('change', () => {
+                        if (checkAll.checked) {
+                            pageIds.forEach(id => selectedIds.add(id));
+                        } else {
+                            pageIds.forEach(id => selectedIds.delete(id));
+                        }
+                        render();
+                    });
+                    checkAllTh.appendChild(checkAll);
+                    headerRow.appendChild(checkAllTh);
+
                     headerRow.appendChild(createSortableHeader('Code', 'code'));
                     headerRow.appendChild(createSortableHeader('Nom', 'nom'));
                     headerRow.appendChild(createSortableHeader('Commune', 'commune'));
@@ -211,14 +250,29 @@ export default function AdminMarchesPage() {
                     const tbody = document.createElement('tbody');
                     tbody.className = 'bg-white divide-y divide-gray-200';
 
-                    // Calculer les items de la page courante
-                    const startIndex = (currentPage - 1) * itemsPerPage;
-                    const endIndex = startIndex + itemsPerPage;
-                    const pageItems = filteredMarches.slice(startIndex, endIndex);
-
                     pageItems.forEach(marche => {
                         const row = document.createElement('tr');
-                        row.className = 'hover:bg-gray-50';
+                        row.className = selectedIds.has(marche.id)
+                            ? 'bg-blue-50'
+                            : 'hover:bg-gray-50';
+
+                        // Checkbox de sélection
+                        const checkCell = document.createElement('td');
+                        checkCell.className = 'px-4 py-4 w-10';
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer';
+                        checkbox.checked = selectedIds.has(marche.id);
+                        checkbox.addEventListener('change', () => {
+                            if (checkbox.checked) {
+                                selectedIds.add(marche.id);
+                            } else {
+                                selectedIds.delete(marche.id);
+                            }
+                            render();
+                        });
+                        checkCell.appendChild(checkbox);
+                        row.appendChild(checkCell);
 
                         // Code
                         const codeCell = document.createElement('td');
@@ -698,6 +752,26 @@ export default function AdminMarchesPage() {
         };
         showModal = true;
         render();
+    }
+
+    async function handleBulkDelete() {
+        const count = selectedIds.size;
+        if (!confirm(`Êtes-vous sûr de vouloir supprimer ${count} marché(s) sélectionné(s) ?`)) {
+            return;
+        }
+
+        try {
+            const result = await api.delete('/api/marches', { ids: Array.from(selectedIds) });
+            const msg = result.message || `${result.deleted_count} marché(s) supprimé(s)`;
+            showToast({ message: msg, type: result.deleted_count > 0 ? 'success' : 'warning' });
+            selectedIds.clear();
+            await loadMarches();
+        } catch (error) {
+            showToast({
+                message: error.message || 'Erreur lors de la suppression en lot',
+                type: 'error'
+            });
+        }
     }
 
     async function handleDelete(marche) {

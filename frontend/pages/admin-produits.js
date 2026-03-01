@@ -44,6 +44,9 @@ export default function AdminProduitsPage() {
     let itemsPerPage = 10;
     let totalPages = 1;
 
+    // Sélection (suppression en lot)
+    let selectedIds = new Set();
+
     // Formulaire
     let formData = {
         nom: '',
@@ -71,6 +74,18 @@ export default function AdminProduitsPage() {
         titleDiv.appendChild(title);
         titleDiv.appendChild(subtitle);
 
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'flex items-center gap-3';
+
+        if (selectedIds.size > 0) {
+            const bulkDeleteBtn = Button({
+                text: `Supprimer la sélection (${selectedIds.size})`,
+                variant: 'danger',
+                onClick: handleBulkDelete
+            });
+            buttonsDiv.appendChild(bulkDeleteBtn);
+        }
+
         const addButton = Button({
             text: '+ Ajouter un produit',
             variant: 'primary',
@@ -89,8 +104,9 @@ export default function AdminProduitsPage() {
             }
         });
 
+        buttonsDiv.appendChild(addButton);
         header.appendChild(titleDiv);
-        header.appendChild(addButton);
+        header.appendChild(buttonsDiv);
 
         return header;
     }
@@ -285,6 +301,26 @@ export default function AdminProduitsPage() {
                         return th;
                     };
 
+                    // Checkbox "tout sélectionner"
+                    const checkAllTh = document.createElement('th');
+                    checkAllTh.className = 'px-4 py-3 w-10';
+                    const checkAll = document.createElement('input');
+                    checkAll.type = 'checkbox';
+                    checkAll.className = 'w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer';
+                    const pageIds = paginatedProduits.map(p => p.id);
+                    checkAll.checked = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+                    checkAll.indeterminate = pageIds.some(id => selectedIds.has(id)) && !checkAll.checked;
+                    checkAll.addEventListener('change', () => {
+                        if (checkAll.checked) {
+                            pageIds.forEach(id => selectedIds.add(id));
+                        } else {
+                            pageIds.forEach(id => selectedIds.delete(id));
+                        }
+                        render();
+                    });
+                    checkAllTh.appendChild(checkAll);
+                    headerRow.appendChild(checkAllTh);
+
                     // En-têtes triables
                     headerRow.appendChild(createSortableHeader('Code', 'code'));
                     headerRow.appendChild(createSortableHeader('Nom', 'nom'));
@@ -312,7 +348,27 @@ export default function AdminProduitsPage() {
 
                     paginatedProduits.forEach(produit => {
                         const row = document.createElement('tr');
-                        row.className = 'hover:bg-gray-50';
+                        row.className = selectedIds.has(produit.id)
+                            ? 'bg-blue-50'
+                            : 'hover:bg-gray-50';
+
+                        // Checkbox de sélection
+                        const checkCell = document.createElement('td');
+                        checkCell.className = 'px-4 py-4 w-10';
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer';
+                        checkbox.checked = selectedIds.has(produit.id);
+                        checkbox.addEventListener('change', () => {
+                            if (checkbox.checked) {
+                                selectedIds.add(produit.id);
+                            } else {
+                                selectedIds.delete(produit.id);
+                            }
+                            render();
+                        });
+                        checkCell.appendChild(checkbox);
+                        row.appendChild(checkCell);
 
                         // Code
                         const codeCell = document.createElement('td');
@@ -569,6 +625,26 @@ export default function AdminProduitsPage() {
         };
         showModal = true;
         render();
+    }
+
+    async function handleBulkDelete() {
+        const count = selectedIds.size;
+        if (!confirm(`Êtes-vous sûr de vouloir supprimer ${count} produit(s) sélectionné(s) ?`)) {
+            return;
+        }
+
+        try {
+            const result = await api.delete('/api/produits', { ids: Array.from(selectedIds) });
+            const msg = result.message || `${result.deleted_count} produit(s) supprimé(s)`;
+            showToast({ message: msg, type: result.deleted_count > 0 ? 'success' : 'warning' });
+            selectedIds.clear();
+            await loadProduits();
+        } catch (error) {
+            showToast({
+                message: error.message || 'Erreur lors de la suppression en lot',
+                type: 'error'
+            });
+        }
     }
 
     async function handleDelete(produit) {

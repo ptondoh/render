@@ -20,6 +20,13 @@ from backend.models import (
 
 class BulkDeleteRequest(BaseModel):
     ids: List[str]
+
+class RemoveMembersRequest(BaseModel):
+    user_ids: List[str]
+
+class RemovePermissionsFromRoleRequest(BaseModel):
+    permission_ids: List[str]
+
 from backend.middleware.security import get_current_user
 from backend.middleware.rbac import require_role, require_permission
 from backend.database import db
@@ -55,7 +62,7 @@ async def get_unites_mesure(current_user: dict = Depends(get_current_user)):
 )
 async def create_unite_mesure(
     unite: UniteMesureCreate,
-    current_user: dict = Depends(require_permission("admin:manage"))
+    current_user: dict = Depends(require_permission("admin:unites"))
 ):
     """
     Créer une nouvelle unité de mesure.
@@ -91,7 +98,7 @@ async def create_unite_mesure(
 async def update_unite_mesure(
     unite_id: str,
     unite: UniteMesureCreate,
-    current_user: dict = Depends(require_permission("admin:manage"))
+    current_user: dict = Depends(require_permission("admin:unites"))
 ):
     """
     Mettre à jour une unité de mesure.
@@ -146,7 +153,7 @@ async def update_unite_mesure(
 @router.delete("/unites-mesure/{unite_id}", response_model=MessageResponse)
 async def delete_unite_mesure(
     unite_id: str,
-    current_user: dict = Depends(require_permission("admin:manage"))
+    current_user: dict = Depends(require_permission("admin:unites"))
 ):
     """
     Supprimer une unité de mesure.
@@ -209,7 +216,7 @@ async def get_categories_produit(current_user: dict = Depends(get_current_user))
 )
 async def create_categorie_produit(
     categorie: CategorieProduitCreate,
-    current_user: dict = Depends(require_permission("admin:manage"))
+    current_user: dict = Depends(require_permission("admin:categories"))
 ):
     """
     Créer une nouvelle catégorie de produit.
@@ -241,7 +248,7 @@ async def create_categorie_produit(
 async def update_categorie_produit(
     categorie_id: str,
     categorie: CategorieProduitCreate,
-    current_user: dict = Depends(require_permission("admin:manage"))
+    current_user: dict = Depends(require_permission("admin:categories"))
 ):
     """
     Mettre à jour une catégorie de produit.
@@ -294,7 +301,7 @@ async def update_categorie_produit(
 @router.delete("/categories-produit/{categorie_id}", response_model=MessageResponse)
 async def delete_categorie_produit(
     categorie_id: str,
-    current_user: dict = Depends(require_permission("admin:manage"))
+    current_user: dict = Depends(require_permission("admin:categories"))
 ):
     """
     Supprimer une catégorie de produit.
@@ -328,6 +335,48 @@ async def delete_categorie_produit(
     return MessageResponse(message="Catégorie supprimée avec succès")
 
 
+@router.delete("/categories-produit", response_model=dict)
+async def bulk_delete_categories(
+    body: BulkDeleteRequest,
+    current_user: dict = Depends(require_permission("admin:categories"))
+):
+    """
+    Supprimer plusieurs catégories de produits en une seule requête.
+    """
+    from bson import ObjectId
+
+    if not body.ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La liste des IDs ne peut pas être vide"
+        )
+
+    deleted_count = 0
+    skipped = []
+
+    for cat_id in body.ids:
+        if not ObjectId.is_valid(cat_id):
+            skipped.append({"id": cat_id, "reason": "ID invalide"})
+            continue
+
+        produits_using = await db.produits.count_documents({"id_categorie": cat_id})
+        if produits_using > 0:
+            skipped.append({"id": cat_id, "reason": f"{produits_using} produit(s) l'utilisent"})
+            continue
+
+        result = await db.categories_produit.delete_one({"_id": ObjectId(cat_id)})
+        if result.deleted_count > 0:
+            deleted_count += 1
+        else:
+            skipped.append({"id": cat_id, "reason": "Non trouvée"})
+
+    return {
+        "deleted_count": deleted_count,
+        "skipped": skipped,
+        "message": f"{deleted_count} catégorie(s) supprimée(s)"
+    }
+
+
 # ============================================================================
 # Catégories d'Utilisateurs
 # ============================================================================
@@ -356,7 +405,7 @@ async def get_categories_user(current_user: dict = Depends(get_current_user)):
 )
 async def create_categorie_user(
     categorie: CategorieUserCreate,
-    current_user: dict = Depends(require_permission("admin:manage"))
+    current_user: dict = Depends(require_permission("admin:categories"))
 ):
     """
     Créer une nouvelle catégorie d'utilisateur.
@@ -626,6 +675,110 @@ async def update_role(
     )
 
 
+@router.get("/roles/{role_id}/members", response_model=list)
+async def get_role_members(
+    role_id: str,
+    current_user: dict = Depends(require_permission("admin:roles:read"))
+):
+    """
+    Liste les utilisateurs qui ont ce rôle.
+    """
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(role_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de rôle invalide")
+
+    role = await db.roles.find_one({"_id": ObjectId(role_id)})
+    if not role:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rôle non trouvé")
+
+    users = await db.users.find(
+        {"roles": role_id},
+        {"password_hash": 0, "mfa_secret": 0, "mfa_backup_codes": 0, "reset_token": 0}
+    ).to_list(None)
+
+    return [
+        {
+            "id": str(u["_id"]),
+            "email": u["email"],
+            "nom": u.get("nom"),
+            "prenom": u.get("prenom"),
+            "actif": u.get("actif", True),
+        }
+        for u in users
+    ]
+
+
+@router.delete("/roles/{role_id}/members", response_model=dict)
+async def remove_role_members(
+    role_id: str,
+    body: RemoveMembersRequest,
+    current_user: dict = Depends(require_permission("admin:roles:update"))
+):
+    """
+    Retire des utilisateurs d'un rôle sans supprimer ni les utilisateurs ni le rôle.
+    """
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(role_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de rôle invalide")
+
+    if not body.user_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La liste user_ids est vide")
+
+    removed_count = 0
+    for uid in body.user_ids:
+        if not ObjectId.is_valid(uid):
+            continue
+        result = await db.users.update_one(
+            {"_id": ObjectId(uid)},
+            {"$pull": {"roles": role_id}}
+        )
+        if result.modified_count > 0:
+            removed_count += 1
+
+    return {
+        "removed_count": removed_count,
+        "message": f"{removed_count} utilisateur(s) retiré(s) du rôle"
+    }
+
+
+@router.delete("/roles/{role_id}/permissions", response_model=dict)
+async def remove_role_permissions(
+    role_id: str,
+    body: RemovePermissionsFromRoleRequest,
+    current_user: dict = Depends(require_permission("admin:roles:update"))
+):
+    """
+    Retire des permissions d'un rôle.
+    """
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(role_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ID de rôle invalide")
+
+    if not body.permission_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La liste permission_ids est vide")
+
+    role = await db.roles.find_one({"_id": ObjectId(role_id)})
+    if not role:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rôle non trouvé")
+
+    current_perms = role.get("id_permissions", [])
+    new_perms = [p for p in current_perms if p not in body.permission_ids]
+    removed_count = len(current_perms) - len(new_perms)
+
+    await db.roles.update_one(
+        {"_id": ObjectId(role_id)},
+        {"$set": {"id_permissions": new_perms}}
+    )
+
+    return {
+        "removed_count": removed_count,
+        "message": f"{removed_count} permission(s) retirée(s) du rôle"
+    }
+
+
 @router.delete("/roles/{role_id}", response_model=MessageResponse)
 async def delete_role(
     role_id: str,
@@ -766,6 +919,283 @@ async def delete_permission(
     )
 
 
+@router.delete("/unites-mesure", response_model=dict)
+async def bulk_delete_unites(
+    body: BulkDeleteRequest,
+    current_user: dict = Depends(require_permission("admin:unites"))
+):
+    """
+    Supprimer plusieurs unités de mesure en une seule requête.
+    """
+    from bson import ObjectId
+
+    if not body.ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La liste des IDs est vide"
+        )
+
+    deleted = []
+    skipped = []
+    not_found = []
+
+    for id_ in body.ids:
+        if not ObjectId.is_valid(id_):
+            not_found.append(id_)
+            continue
+
+        doc = await db.unites_mesure.find_one({"_id": ObjectId(id_)})
+        if not doc:
+            not_found.append(id_)
+            continue
+
+        produits_using = await db.produits.count_documents({"id_unite_mesure": id_})
+        if produits_using > 0:
+            skipped.append(doc.get("unite", id_))
+            continue
+
+        await db.unites_mesure.delete_one({"_id": ObjectId(id_)})
+        deleted.append(doc.get("unite", id_))
+
+    return {
+        "deleted_count": len(deleted),
+        "skipped_count": len(skipped),
+        "not_found_count": len(not_found),
+        "deleted": deleted,
+        "skipped": skipped,
+        "message": f"{len(deleted)} unité(s) supprimée(s)"
+            + (f", {len(skipped)} ignorée(s) (utilisées par des produits)" if skipped else "")
+    }
+
+
+@router.delete("/departements", response_model=dict)
+async def bulk_delete_departements(
+    body: BulkDeleteRequest,
+    current_user: dict = Depends(require_permission("admin:departements"))
+):
+    """
+    Supprimer plusieurs départements en une seule requête.
+    """
+    from bson import ObjectId
+
+    if not body.ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La liste des IDs est vide"
+        )
+
+    deleted = []
+    skipped = []
+    not_found = []
+
+    for id_ in body.ids:
+        if not ObjectId.is_valid(id_):
+            not_found.append(id_)
+            continue
+
+        doc = await db.departements.find_one({"_id": ObjectId(id_)})
+        if not doc:
+            not_found.append(id_)
+            continue
+
+        communes_using = await db.communes.count_documents({"departement_id": id_})
+        if communes_using > 0:
+            skipped.append(doc.get("nom", id_))
+            continue
+
+        await db.departements.delete_one({"_id": ObjectId(id_)})
+        deleted.append(doc.get("nom", id_))
+
+    return {
+        "deleted_count": len(deleted),
+        "skipped_count": len(skipped),
+        "not_found_count": len(not_found),
+        "deleted": deleted,
+        "skipped": skipped,
+        "message": f"{len(deleted)} département(s) supprimé(s)"
+            + (f", {len(skipped)} ignoré(s) (ont des communes)" if skipped else "")
+    }
+
+
+@router.delete("/communes", response_model=dict)
+async def bulk_delete_communes(
+    body: BulkDeleteRequest,
+    current_user: dict = Depends(require_permission("admin:communes"))
+):
+    """
+    Supprimer plusieurs communes en une seule requête.
+    """
+    from bson import ObjectId
+
+    if not body.ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La liste des IDs est vide"
+        )
+
+    deleted = []
+    skipped = []
+    not_found = []
+
+    for id_ in body.ids:
+        if not ObjectId.is_valid(id_):
+            not_found.append(id_)
+            continue
+
+        doc = await db.communes.find_one({"_id": ObjectId(id_)})
+        if not doc:
+            not_found.append(id_)
+            continue
+
+        marches_using = await db.marches.count_documents({"commune_id": id_})
+        if marches_using > 0:
+            skipped.append(doc.get("nom", id_))
+            continue
+
+        await db.communes.delete_one({"_id": ObjectId(id_)})
+        deleted.append(doc.get("nom", id_))
+
+    return {
+        "deleted_count": len(deleted),
+        "skipped_count": len(skipped),
+        "not_found_count": len(not_found),
+        "deleted": deleted,
+        "skipped": skipped,
+        "message": f"{len(deleted)} commune(s) supprimée(s)"
+            + (f", {len(skipped)} ignorée(s) (ont des marchés)" if skipped else "")
+    }
+
+
+@router.delete("/marches", response_model=dict)
+async def bulk_delete_marches(
+    body: BulkDeleteRequest,
+    current_user: dict = Depends(require_permission("marches:delete"))
+):
+    """
+    Supprimer plusieurs marchés en une seule requête.
+    """
+    from bson import ObjectId
+
+    if not body.ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La liste des IDs est vide"
+        )
+
+    deleted = []
+    not_found = []
+
+    for id_ in body.ids:
+        if not ObjectId.is_valid(id_):
+            not_found.append(id_)
+            continue
+
+        doc = await db.marches.find_one({"_id": ObjectId(id_)})
+        if not doc:
+            not_found.append(id_)
+            continue
+
+        await db.marches.delete_one({"_id": ObjectId(id_)})
+        deleted.append(doc.get("nom", id_))
+
+    return {
+        "deleted_count": len(deleted),
+        "not_found_count": len(not_found),
+        "deleted": deleted,
+        "message": f"{len(deleted)} marché(s) supprimé(s)"
+    }
+
+
+@router.delete("/produits", response_model=dict)
+async def bulk_delete_produits(
+    body: BulkDeleteRequest,
+    current_user: dict = Depends(require_permission("produits:delete"))
+):
+    """
+    Supprimer plusieurs produits en une seule requête.
+    """
+    from bson import ObjectId
+
+    if not body.ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La liste des IDs est vide"
+        )
+
+    deleted = []
+    not_found = []
+
+    for id_ in body.ids:
+        if not ObjectId.is_valid(id_):
+            not_found.append(id_)
+            continue
+
+        doc = await db.produits.find_one({"_id": ObjectId(id_)})
+        if not doc:
+            not_found.append(id_)
+            continue
+
+        await db.produits.delete_one({"_id": ObjectId(id_)})
+        deleted.append(doc.get("nom", id_))
+
+    return {
+        "deleted_count": len(deleted),
+        "not_found_count": len(not_found),
+        "deleted": deleted,
+        "message": f"{len(deleted)} produit(s) supprimé(s)"
+    }
+
+
+@router.delete("/roles", response_model=dict)
+async def bulk_delete_roles(
+    body: BulkDeleteRequest,
+    current_user: dict = Depends(require_permission("admin:roles:delete"))
+):
+    """
+    Supprimer plusieurs rôles en une seule requête.
+    Ignore les rôles utilisés par des utilisateurs.
+    """
+    from bson import ObjectId
+
+    if not body.ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La liste des IDs est vide"
+        )
+
+    deleted = []
+    skipped_users = []
+    not_found = []
+
+    for role_id in body.ids:
+        if not ObjectId.is_valid(role_id):
+            not_found.append(role_id)
+            continue
+
+        role = await db.roles.find_one({"_id": ObjectId(role_id)})
+        if not role:
+            not_found.append(role_id)
+            continue
+
+        users_with_role = await db.users.count_documents({"roles": role_id})
+        if users_with_role > 0:
+            skipped_users.append(role["nom"])
+            continue
+
+        await db.roles.delete_one({"_id": ObjectId(role_id)})
+        deleted.append(role["nom"])
+
+    return {
+        "deleted_count": len(deleted),
+        "skipped_count": len(skipped_users),
+        "not_found_count": len(not_found),
+        "deleted": deleted,
+        "skipped_users": skipped_users,
+        "message": f"{len(deleted)} rôle(s) supprimé(s)"
+            + (f", {len(skipped_users)} ignoré(s) (utilisés par des utilisateurs)" if skipped_users else "")
+    }
+
+
 @router.delete("/permissions", response_model=dict)
 async def bulk_delete_permissions(
     body: BulkDeleteRequest,
@@ -787,6 +1217,8 @@ async def bulk_delete_permissions(
     skipped_roles = []
     not_found = []
 
+    detached_from_roles = 0
+
     for permission_id in body.ids:
         if not ObjectId.is_valid(permission_id):
             not_found.append(permission_id)
@@ -797,11 +1229,12 @@ async def bulk_delete_permissions(
             not_found.append(permission_id)
             continue
 
-        # Vérifier qu'aucun rôle n'utilise cette permission
-        roles_with_perm = await db.roles.count_documents({"id_permissions": permission_id})
-        if roles_with_perm > 0:
-            skipped_roles.append(permission["nom"])
-            continue
+        # Retirer la permission de tous les rôles qui l'utilisent avant de supprimer
+        update_result = await db.roles.update_many(
+            {"id_permissions": permission_id},
+            {"$pull": {"id_permissions": permission_id}}
+        )
+        detached_from_roles += update_result.modified_count
 
         await db.permissions.delete_one({"_id": ObjectId(permission_id)})
         deleted.append(permission["nom"])
@@ -812,6 +1245,7 @@ async def bulk_delete_permissions(
         "not_found_count": len(not_found),
         "deleted": deleted,
         "skipped_roles": skipped_roles,
+        "detached_from_roles": detached_from_roles,
         "message": f"{len(deleted)} permission(s) supprimée(s)"
-            + (f", {len(skipped_roles)} ignorée(s) (utilisées par des rôles)" if skipped_roles else "")
+            + (f", retirée(s) de {detached_from_roles} rôle(s)" if detached_from_roles else "")
     }

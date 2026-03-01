@@ -33,6 +33,7 @@ export default function AdminCategoriesPage() {
     let searchTerm = '';
     let editingCategorie = null;
     let showModal = false;
+    let selectedIds = new Set();
 
     // Tri
     let sortColumn = 'nom';
@@ -67,6 +68,18 @@ export default function AdminCategoriesPage() {
         titleDiv.appendChild(title);
         titleDiv.appendChild(subtitle);
 
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'flex items-center gap-3';
+
+        if (selectedIds.size > 0) {
+            const bulkDeleteBtn = Button({
+                text: `Supprimer la sélection (${selectedIds.size})`,
+                variant: 'danger',
+                onClick: handleBulkDelete
+            });
+            buttonsDiv.appendChild(bulkDeleteBtn);
+        }
+
         const addButton = Button({
             text: '+ Ajouter une catégorie',
             variant: 'primary',
@@ -78,8 +91,9 @@ export default function AdminCategoriesPage() {
             }
         });
 
+        buttonsDiv.appendChild(addButton);
         header.appendChild(titleDiv);
-        header.appendChild(addButton);
+        header.appendChild(buttonsDiv);
 
         return header;
     }
@@ -163,6 +177,26 @@ export default function AdminCategoriesPage() {
                         return th;
                     };
 
+                    // Checkbox "select all"
+                    const checkAllTh = document.createElement('th');
+                    checkAllTh.className = 'px-4 py-3';
+                    const checkAll = document.createElement('input');
+                    checkAll.type = 'checkbox';
+                    checkAll.className = 'rounded border-gray-300';
+                    const pageIds = filteredCategories.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(c => c.id);
+                    checkAll.checked = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+                    checkAll.indeterminate = pageIds.some(id => selectedIds.has(id)) && !checkAll.checked;
+                    checkAll.addEventListener('change', () => {
+                        if (checkAll.checked) {
+                            pageIds.forEach(id => selectedIds.add(id));
+                        } else {
+                            pageIds.forEach(id => selectedIds.delete(id));
+                        }
+                        render();
+                    });
+                    checkAllTh.appendChild(checkAll);
+                    headerRow.appendChild(checkAllTh);
+
                     headerRow.appendChild(createSortableHeader('Nom', 'nom'));
                     headerRow.appendChild(createSortableHeader('Nom Créole', 'nom_creole'));
 
@@ -190,7 +224,22 @@ export default function AdminCategoriesPage() {
 
                     pageItems.forEach(categorie => {
                         const row = document.createElement('tr');
-                        row.className = 'hover:bg-gray-50';
+                        row.className = selectedIds.has(categorie.id) ? 'bg-blue-50' : 'hover:bg-gray-50';
+
+                        // Checkbox individuel
+                        const checkCell = document.createElement('td');
+                        checkCell.className = 'px-4 py-4';
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'rounded border-gray-300';
+                        checkbox.checked = selectedIds.has(categorie.id);
+                        checkbox.addEventListener('change', () => {
+                            if (checkbox.checked) selectedIds.add(categorie.id);
+                            else selectedIds.delete(categorie.id);
+                            render();
+                        });
+                        checkCell.appendChild(checkbox);
+                        row.appendChild(checkCell);
 
                         // Nom
                         const nomCell = document.createElement('td');
@@ -474,6 +523,24 @@ export default function AdminCategoriesPage() {
                 message: error.message || 'Erreur lors de la suppression',
                 type: 'error'
             });
+        }
+    }
+
+    async function handleBulkDelete() {
+        if (selectedIds.size === 0) return;
+        if (!confirm(`Êtes-vous sûr de vouloir supprimer ${selectedIds.size} catégorie(s) ?`)) return;
+
+        try {
+            const result = await api.delete('/api/categories-produit', { ids: Array.from(selectedIds) });
+            const msg = result.message || `${result.deleted_count} catégorie(s) supprimée(s)`;
+            showToast({ message: msg, type: result.deleted_count > 0 ? 'success' : 'warning' });
+            if (result.skipped && result.skipped.length > 0) {
+                result.skipped.forEach(s => showToast({ message: `Ignoré : ${s.reason}`, type: 'warning' }));
+            }
+            selectedIds.clear();
+            await loadCategories();
+        } catch (error) {
+            showToast({ message: error.message || 'Erreur lors de la suppression', type: 'error' });
         }
     }
 

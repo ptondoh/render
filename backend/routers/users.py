@@ -9,6 +9,7 @@ from datetime import datetime
 import secrets
 
 from bson import ObjectId
+from pydantic import BaseModel
 
 from backend.database import get_database
 from backend.models import (
@@ -23,6 +24,10 @@ from backend.middleware.security import get_current_user
 from backend.middleware.rbac import require_bailleur, require_permission
 from backend.middleware.audit import log_action
 from backend.services.auth import hash_password
+
+
+class BulkDeleteUsersRequest(BaseModel):
+    ids: List[str]
 
 router = APIRouter(prefix="/api", tags=["Users Management"])
 
@@ -622,3 +627,78 @@ async def toggle_status(
         mfa_enabled=updated_user["mfa_enabled"],
         created_at=updated_user["created_at"]
     )
+
+
+@router.delete("/users", response_model=dict)
+async def bulk_delete_users(
+    body: BulkDeleteUsersRequest,
+    current_user: dict = Depends(require_bailleur)
+):
+    """
+    Désactiver plusieurs utilisateurs en une seule requête (soft delete).
+
+    **Sécurité**: Réservé aux bailleurs uniquement.
+
+    **Note**: Les utilisateurs ne sont pas supprimés physiquement, mais désactivés (actif=False).
+    Ne peut pas désactiver son propre compte.
+    """
+    db = get_database()
+
+    if not body.ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La liste des IDs est vide"
+        )
+
+    current_user_id = str(current_user.id)
+    deleted = []
+    skipped_self = []
+    not_found = []
+
+    for user_id in body.ids:
+        if not ObjectId.is_valid(user_id):
+            not_found.append(user_id)
+            continue
+
+        # Empêcher la suppression de son propre compte
+        if current_user_id == user_id:
+            skipped_self.append(user_id)
+            continue
+
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            not_found.append(user_id)
+            continue
+
+        # Soft delete
+        await db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {
+                "$set": {
+                    "actif": False,
+                    "mfa_enabled": False,
+                    "mfa_secret": None,
+                    "mfa_backup_codes": [],
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+
+        deleted.append(user["email"])
+
+        await log_action(
+            current_user_id,
+            "user_bulk_deleted",
+            "user",
+            user_id,
+            details={"email": user["email"]}
+        )
+
+    return {
+        "deleted_count": len(deleted),
+        "skipped_self_count": len(skipped_self),
+        "not_found_count": len(not_found),
+        "deleted": deleted,
+        "message": f"{len(deleted)} utilisateur(s) désactivé(s)"
+            + (f", votre propre compte a été ignoré" if skipped_self else "")
+    }

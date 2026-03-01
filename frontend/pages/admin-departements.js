@@ -43,6 +43,9 @@ export default function AdminDepartementsPage() {
     let itemsPerPage = 10;
     let totalPages = 1;
 
+    // Sélection (suppression en lot)
+    let selectedIds = new Set();
+
     // Formulaire
     let formData = {
         code: '',
@@ -67,6 +70,18 @@ export default function AdminDepartementsPage() {
         titleDiv.appendChild(title);
         titleDiv.appendChild(subtitle);
 
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'flex items-center gap-3';
+
+        if (selectedIds.size > 0) {
+            const bulkDeleteBtn = Button({
+                text: `Supprimer la sélection (${selectedIds.size})`,
+                variant: 'danger',
+                onClick: handleBulkDelete
+            });
+            buttonsDiv.appendChild(bulkDeleteBtn);
+        }
+
         const addButton = Button({
             text: '+ Ajouter un département',
             variant: 'primary',
@@ -78,8 +93,9 @@ export default function AdminDepartementsPage() {
             }
         });
 
+        buttonsDiv.appendChild(addButton);
         header.appendChild(titleDiv);
-        header.appendChild(addButton);
+        header.appendChild(buttonsDiv);
 
         return header;
     }
@@ -229,6 +245,31 @@ export default function AdminDepartementsPage() {
             return th;
         };
 
+        // Pagination
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const paginatedDepartements = filteredDepartements.slice(startIndex, endIndex);
+
+        // Checkbox "tout sélectionner"
+        const checkAllTh = document.createElement('th');
+        checkAllTh.className = 'px-4 py-3 w-10';
+        const checkAll = document.createElement('input');
+        checkAll.type = 'checkbox';
+        checkAll.className = 'w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer';
+        const pageIds = paginatedDepartements.map(d => d.id);
+        checkAll.checked = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+        checkAll.indeterminate = pageIds.some(id => selectedIds.has(id)) && !checkAll.checked;
+        checkAll.addEventListener('change', () => {
+            if (checkAll.checked) {
+                pageIds.forEach(id => selectedIds.add(id));
+            } else {
+                pageIds.forEach(id => selectedIds.delete(id));
+            }
+            render();
+        });
+        checkAllTh.appendChild(checkAll);
+        headerRow.appendChild(checkAllTh);
+
         headerRow.appendChild(createSortableHeader('Code', 'code'));
         headerRow.appendChild(createSortableHeader('Nom', 'nom'));
 
@@ -251,14 +292,29 @@ export default function AdminDepartementsPage() {
         const tbody = document.createElement('tbody');
         tbody.className = 'bg-white divide-y divide-gray-200';
 
-        // Pagination
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        const paginatedDepartements = filteredDepartements.slice(startIndex, endIndex);
-
         paginatedDepartements.forEach(dept => {
             const row = document.createElement('tr');
-            row.className = 'hover:bg-gray-50';
+            row.className = selectedIds.has(dept.id)
+                ? 'bg-blue-50'
+                : 'hover:bg-gray-50';
+
+            // Checkbox de sélection
+            const checkCell = document.createElement('td');
+            checkCell.className = 'px-4 py-4 w-10';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer';
+            checkbox.checked = selectedIds.has(dept.id);
+            checkbox.addEventListener('change', () => {
+                if (checkbox.checked) {
+                    selectedIds.add(dept.id);
+                } else {
+                    selectedIds.delete(dept.id);
+                }
+                render();
+            });
+            checkCell.appendChild(checkbox);
+            row.appendChild(checkCell);
 
             // Code
             const codeCell = document.createElement('td');
@@ -485,6 +541,32 @@ export default function AdminDepartementsPage() {
         };
         showModal = true;
         render();
+    }
+
+    async function handleBulkDelete() {
+        const count = selectedIds.size;
+        if (!confirm(`Êtes-vous sûr de vouloir supprimer ${count} département(s) sélectionné(s) ?\n\nLes départements ayant des communes seront ignorés.`)) {
+            return;
+        }
+
+        try {
+            const result = await api.delete('/api/departements', { ids: Array.from(selectedIds) });
+            const msg = result.message || `${result.deleted_count} département(s) supprimé(s)`;
+            showToast({ message: msg, type: result.deleted_count > 0 ? 'success' : 'warning' });
+            if (result.skipped && result.skipped.length > 0) {
+                showToast({
+                    message: `Ignorés (ont des communes) : ${result.skipped.join(', ')}`,
+                    type: 'warning'
+                });
+            }
+            selectedIds.clear();
+            await loadDepartements();
+        } catch (error) {
+            showToast({
+                message: error.message || 'Erreur lors de la suppression en lot',
+                type: 'error'
+            });
+        }
     }
 
     async function handleDelete(dept) {

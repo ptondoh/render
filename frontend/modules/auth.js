@@ -88,10 +88,6 @@ class AuthManager {
             };
 
         } catch (error) {
-            showToast({
-                message: error.message || 'Erreur lors de la connexion',
-                type: 'error',
-            });
             throw error;
         }
     }
@@ -124,10 +120,6 @@ class AuthManager {
             };
 
         } catch (error) {
-            showToast({
-                message: error.message || 'Code MFA invalide',
-                type: 'error',
-            });
             throw error;
         }
     }

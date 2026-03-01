@@ -43,6 +43,20 @@ export default function AdminRolesPage() {
     let itemsPerPage = 10;
     let totalPages = 1;
 
+    // Sélection (suppression en lot)
+    let selectedIds = new Set();
+
+    // Panneau Détail d'un rôle
+    let showDetailModal = false;
+    let detailRole = null;
+    let activeTab = 'users';       // 'users' | 'permissions'
+    let detailUsers = [];
+    let isLoadingDetail = false;
+    let selectedDetailUserIds = new Set();
+    let selectedDetailPermIds = new Set();
+    let detailUserPage = 1;
+    const detailUserPerPage = 10;
+
     // Formulaire
     let formData = {
         nom: '',
@@ -69,6 +83,18 @@ export default function AdminRolesPage() {
         titleDiv.appendChild(title);
         titleDiv.appendChild(subtitle);
 
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'flex items-center gap-3';
+
+        if (selectedIds.size > 0) {
+            const bulkDeleteBtn = Button({
+                text: `Supprimer la sélection (${selectedIds.size})`,
+                variant: 'danger',
+                onClick: handleBulkDelete
+            });
+            buttonsDiv.appendChild(bulkDeleteBtn);
+        }
+
         const addButton = Button({
             text: '+ Ajouter un rôle',
             variant: 'primary',
@@ -84,8 +110,9 @@ export default function AdminRolesPage() {
             }
         });
 
+        buttonsDiv.appendChild(addButton);
         header.appendChild(titleDiv);
-        header.appendChild(addButton);
+        header.appendChild(buttonsDiv);
 
         return header;
     }
@@ -269,6 +296,26 @@ export default function AdminRolesPage() {
                         return th;
                     };
 
+                    // Checkbox "tout sélectionner"
+                    const checkAllTh = document.createElement('th');
+                    checkAllTh.className = 'px-4 py-3 w-10';
+                    const checkAll = document.createElement('input');
+                    checkAll.type = 'checkbox';
+                    checkAll.className = 'w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer';
+                    const pageIds = paginatedRoles.map(r => r.id);
+                    checkAll.checked = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+                    checkAll.indeterminate = pageIds.some(id => selectedIds.has(id)) && !checkAll.checked;
+                    checkAll.addEventListener('change', () => {
+                        if (checkAll.checked) {
+                            pageIds.forEach(id => selectedIds.add(id));
+                        } else {
+                            pageIds.forEach(id => selectedIds.delete(id));
+                        }
+                        render();
+                    });
+                    checkAllTh.appendChild(checkAll);
+                    headerRow.appendChild(checkAllTh);
+
                     // En-têtes triables
                     headerRow.appendChild(createSortableHeader('Nom', 'nom'));
                     headerRow.appendChild(createSortableHeader('Description', 'description'));
@@ -289,7 +336,27 @@ export default function AdminRolesPage() {
 
                     paginatedRoles.forEach(role => {
                         const row = document.createElement('tr');
-                        row.className = 'hover:bg-gray-50';
+                        row.className = selectedIds.has(role.id)
+                            ? 'bg-blue-50'
+                            : 'hover:bg-gray-50';
+
+                        // Checkbox de sélection
+                        const checkCell = document.createElement('td');
+                        checkCell.className = 'px-4 py-4 w-10';
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.className = 'w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer';
+                        checkbox.checked = selectedIds.has(role.id);
+                        checkbox.addEventListener('change', () => {
+                            if (checkbox.checked) {
+                                selectedIds.add(role.id);
+                            } else {
+                                selectedIds.delete(role.id);
+                            }
+                            render();
+                        });
+                        checkCell.appendChild(checkbox);
+                        row.appendChild(checkCell);
 
                         // Nom
                         const nomCell = document.createElement('td');
@@ -321,6 +388,13 @@ export default function AdminRolesPage() {
                         const actionsContainer = document.createElement('div');
                         actionsContainer.className = 'flex justify-end gap-2';
 
+                        const detailBtn = Button({
+                            text: 'Détail',
+                            variant: 'secondary',
+                            size: 'sm',
+                            onClick: () => openDetail(role)
+                        });
+
                         const editBtn = Button({
                             text: 'Modifier',
                             variant: 'secondary',
@@ -335,6 +409,7 @@ export default function AdminRolesPage() {
                             onClick: () => handleDelete(role)
                         });
 
+                        actionsContainer.appendChild(detailBtn);
                         actionsContainer.appendChild(editBtn);
                         actionsContainer.appendChild(deleteBtn);
 
@@ -501,6 +576,32 @@ export default function AdminRolesPage() {
         render();
     }
 
+    async function handleBulkDelete() {
+        const count = selectedIds.size;
+        if (!confirm(`Êtes-vous sûr de vouloir supprimer ${count} rôle(s) sélectionné(s) ?\n\nLes rôles utilisés par des utilisateurs seront ignorés.`)) {
+            return;
+        }
+
+        try {
+            const result = await api.delete('/api/roles', { ids: Array.from(selectedIds) });
+            const msg = result.message || `${result.deleted_count} rôle(s) supprimé(s)`;
+            showToast({ message: msg, type: result.deleted_count > 0 ? 'success' : 'warning' });
+            if (result.skipped_users && result.skipped_users.length > 0) {
+                showToast({
+                    message: `Ignorés (utilisés par des utilisateurs) : ${result.skipped_users.join(', ')}`,
+                    type: 'warning'
+                });
+            }
+            selectedIds.clear();
+            await loadRoles();
+        } catch (error) {
+            showToast({
+                message: error.message || 'Erreur lors de la suppression en lot',
+                type: 'error'
+            });
+        }
+    }
+
     async function handleDelete(role) {
         if (!confirm(`Êtes-vous sûr de vouloir supprimer le rôle "${role.nom}" ?\n\nCette action sera impossible si des utilisateurs utilisent ce rôle.`)) {
             return;
@@ -551,6 +652,443 @@ export default function AdminRolesPage() {
                 type: 'error'
             });
         }
+    }
+
+    // ========================================================================
+    // Panneau Détail — ouverture et chargement
+    // ========================================================================
+    async function openDetail(role) {
+        detailRole = role;
+        activeTab = 'users';
+        selectedDetailUserIds = new Set();
+        selectedDetailPermIds = new Set();
+        detailUserPage = 1;
+        detailUsers = [];
+        showDetailModal = true;
+        isLoadingDetail = true;
+        render();
+
+        try {
+            detailUsers = await api.get(`/api/roles/${role.id}/members`);
+        } catch (e) {
+            showToast({ message: e.message || 'Erreur lors du chargement des membres', type: 'error' });
+            detailUsers = [];
+        }
+        isLoadingDetail = false;
+        render();
+    }
+
+    async function handleRemoveMember(userId) {
+        try {
+            const r = await api.delete(`/api/roles/${detailRole.id}/members`, { user_ids: [userId] });
+            showToast({ message: r.message, type: 'success' });
+            detailUsers = detailUsers.filter(u => u.id !== userId);
+            selectedDetailUserIds.delete(userId);
+            roles = roles.map(ro => ro.id === detailRole.id
+                ? { ...ro }
+                : ro
+            );
+            await loadRoles();
+            // Remettre à jour detailRole depuis la liste rechargée
+            detailRole = roles.find(r => r.id === detailRole.id) || detailRole;
+            render();
+        } catch (e) {
+            showToast({ message: e.message || 'Erreur lors du retrait', type: 'error' });
+        }
+    }
+
+    async function handleBulkRemoveMembers() {
+        if (selectedDetailUserIds.size === 0) return;
+        if (!confirm(`Retirer ${selectedDetailUserIds.size} utilisateur(s) de ce rôle ?`)) return;
+        try {
+            const r = await api.delete(`/api/roles/${detailRole.id}/members`, { user_ids: Array.from(selectedDetailUserIds) });
+            showToast({ message: r.message, type: 'success' });
+            const removed = new Set(selectedDetailUserIds);
+            detailUsers = detailUsers.filter(u => !removed.has(u.id));
+            selectedDetailUserIds.clear();
+            await loadRoles();
+            detailRole = roles.find(r => r.id === detailRole.id) || detailRole;
+            render();
+        } catch (e) {
+            showToast({ message: e.message || 'Erreur lors du retrait groupé', type: 'error' });
+        }
+    }
+
+    async function handleRemovePermission(permId) {
+        try {
+            const r = await api.delete(`/api/roles/${detailRole.id}/permissions`, { permission_ids: [permId] });
+            showToast({ message: r.message, type: 'success' });
+            detailRole = {
+                ...detailRole,
+                permissions: (detailRole.permissions || []).filter(p => p.id !== permId),
+                id_permissions: (detailRole.id_permissions || []).filter(id => id !== permId)
+            };
+            selectedDetailPermIds.delete(permId);
+            await loadRoles();
+            render();
+        } catch (e) {
+            showToast({ message: e.message || 'Erreur lors du retrait', type: 'error' });
+        }
+    }
+
+    async function handleBulkRemovePermissions() {
+        if (selectedDetailPermIds.size === 0) return;
+        if (!confirm(`Retirer ${selectedDetailPermIds.size} permission(s) de ce rôle ?`)) return;
+        try {
+            const r = await api.delete(`/api/roles/${detailRole.id}/permissions`, { permission_ids: Array.from(selectedDetailPermIds) });
+            showToast({ message: r.message, type: 'success' });
+            const removed = new Set(selectedDetailPermIds);
+            detailRole = {
+                ...detailRole,
+                permissions: (detailRole.permissions || []).filter(p => !removed.has(p.id)),
+                id_permissions: (detailRole.id_permissions || []).filter(id => !removed.has(id))
+            };
+            selectedDetailPermIds.clear();
+            await loadRoles();
+            render();
+        } catch (e) {
+            showToast({ message: e.message || 'Erreur lors du retrait groupé', type: 'error' });
+        }
+    }
+
+    // ========================================================================
+    // Panneau Détail — rendu modal avec onglets
+    // ========================================================================
+    function renderDetailModal() {
+        if (!showDetailModal || !detailRole) return document.createElement('div');
+
+        // Overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                showDetailModal = false;
+                render();
+            }
+        });
+
+        // Panneau principal
+        const panel = document.createElement('div');
+        panel.className = 'bg-white rounded-xl shadow-2xl w-full max-w-3xl flex flex-col overflow-hidden';
+        panel.style.maxHeight = '90vh';
+        overlay.appendChild(panel);
+
+        // ── En-tête ──────────────────────────────────────────────────────────
+        const panelHeader = document.createElement('div');
+        panelHeader.className = 'flex items-center justify-between px-6 py-4 border-b border-gray-200';
+
+        const panelTitle = document.createElement('div');
+        const titleEl = document.createElement('h2');
+        titleEl.className = 'text-xl font-bold text-gray-900';
+        titleEl.textContent = `Rôle : ${detailRole.nom}`;
+        const subtitleEl = document.createElement('p');
+        subtitleEl.className = 'text-sm text-gray-500 mt-0.5';
+        subtitleEl.textContent = detailRole.description || '';
+        panelTitle.appendChild(titleEl);
+        if (detailRole.description) panelTitle.appendChild(subtitleEl);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'text-gray-400 hover:text-gray-600 text-2xl leading-none font-bold p-1';
+        closeBtn.textContent = '×';
+        closeBtn.addEventListener('click', () => { showDetailModal = false; render(); });
+
+        panelHeader.appendChild(panelTitle);
+        panelHeader.appendChild(closeBtn);
+        panel.appendChild(panelHeader);
+
+        // ── Onglets ──────────────────────────────────────────────────────────
+        const tabsBar = document.createElement('div');
+        tabsBar.className = 'flex border-b border-gray-200 px-6';
+
+        const userCount = detailUsers.length;
+        const permCount = (detailRole.permissions || []).length;
+
+        const tabsConfig = [
+            { key: 'users', label: `👥 Utilisateurs (${isLoadingDetail ? '…' : userCount})` },
+            { key: 'permissions', label: `🔑 Permissions (${permCount})` }
+        ];
+
+        tabsConfig.forEach(({ key, label }) => {
+            const tab = document.createElement('button');
+            tab.className = activeTab === key
+                ? 'px-4 py-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600 -mb-px'
+                : 'px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent -mb-px';
+            tab.textContent = label;
+            tab.addEventListener('click', () => {
+                activeTab = key;
+                selectedDetailUserIds = new Set();
+                selectedDetailPermIds = new Set();
+                render();
+            });
+            tabsBar.appendChild(tab);
+        });
+        panel.appendChild(tabsBar);
+
+        // ── Corps scrollable ─────────────────────────────────────────────────
+        const body = document.createElement('div');
+        body.className = 'flex-1 overflow-y-auto p-6 min-h-0';
+
+        if (activeTab === 'users') {
+            // ---- Onglet Utilisateurs ----------------------------------------
+            if (isLoadingDetail) {
+                const spinnerWrap = document.createElement('div');
+                spinnerWrap.className = 'flex justify-center py-10';
+                spinnerWrap.appendChild(Spinner({ size: 'lg' }));
+                body.appendChild(spinnerWrap);
+            } else if (detailUsers.length === 0) {
+                const empty = document.createElement('p');
+                empty.className = 'text-center text-gray-500 py-10';
+                empty.textContent = 'Aucun utilisateur n\'a ce rôle.';
+                body.appendChild(empty);
+            } else {
+                // Bouton retrait groupé
+                if (selectedDetailUserIds.size > 0) {
+                    const bulkBtn = Button({
+                        text: `Retirer la sélection (${selectedDetailUserIds.size})`,
+                        variant: 'danger',
+                        onClick: handleBulkRemoveMembers
+                    });
+                    bulkBtn.className += ' mb-4';
+                    body.appendChild(bulkBtn);
+                }
+
+                // Pagination locale
+                const totalUserPages = Math.max(1, Math.ceil(detailUsers.length / detailUserPerPage));
+                if (detailUserPage > totalUserPages) detailUserPage = totalUserPages;
+                const pageUsers = detailUsers.slice((detailUserPage - 1) * detailUserPerPage, detailUserPage * detailUserPerPage);
+
+                // Tableau
+                const table = document.createElement('table');
+                table.className = 'min-w-full divide-y divide-gray-200 text-sm';
+
+                const thead = document.createElement('thead');
+                thead.className = 'bg-gray-50';
+                const headerRow = document.createElement('tr');
+
+                // Select-all
+                const checkAllTh = document.createElement('th');
+                checkAllTh.className = 'px-3 py-2 w-8';
+                const checkAll = document.createElement('input');
+                checkAll.type = 'checkbox';
+                checkAll.className = 'rounded border-gray-300';
+                const pageUserIds = pageUsers.map(u => u.id);
+                checkAll.checked = pageUserIds.length > 0 && pageUserIds.every(id => selectedDetailUserIds.has(id));
+                checkAll.indeterminate = pageUserIds.some(id => selectedDetailUserIds.has(id)) && !checkAll.checked;
+                checkAll.addEventListener('change', () => {
+                    if (checkAll.checked) pageUserIds.forEach(id => selectedDetailUserIds.add(id));
+                    else pageUserIds.forEach(id => selectedDetailUserIds.delete(id));
+                    render();
+                });
+                checkAllTh.appendChild(checkAll);
+                headerRow.appendChild(checkAllTh);
+
+                ['Email', 'Nom Prénom', 'Statut', ''].forEach(text => {
+                    const th = document.createElement('th');
+                    th.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase';
+                    th.textContent = text;
+                    headerRow.appendChild(th);
+                });
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
+
+                const tbody = document.createElement('tbody');
+                tbody.className = 'bg-white divide-y divide-gray-100';
+
+                pageUsers.forEach(user => {
+                    const row = document.createElement('tr');
+                    row.className = selectedDetailUserIds.has(user.id) ? 'bg-blue-50' : 'hover:bg-gray-50';
+
+                    const checkTd = document.createElement('td');
+                    checkTd.className = 'px-3 py-3';
+                    const cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.className = 'rounded border-gray-300';
+                    cb.checked = selectedDetailUserIds.has(user.id);
+                    cb.addEventListener('change', () => {
+                        if (cb.checked) selectedDetailUserIds.add(user.id);
+                        else selectedDetailUserIds.delete(user.id);
+                        render();
+                    });
+                    checkTd.appendChild(cb);
+                    row.appendChild(checkTd);
+
+                    const emailTd = document.createElement('td');
+                    emailTd.className = 'px-4 py-3 text-gray-900';
+                    emailTd.textContent = user.email;
+                    row.appendChild(emailTd);
+
+                    const nameTd = document.createElement('td');
+                    nameTd.className = 'px-4 py-3 text-gray-600';
+                    nameTd.textContent = [user.prenom, user.nom].filter(Boolean).join(' ') || '-';
+                    row.appendChild(nameTd);
+
+                    const statusTd = document.createElement('td');
+                    statusTd.className = 'px-4 py-3';
+                    const statusBadge = Badge({
+                        text: user.actif ? 'Actif' : 'Inactif',
+                        variant: user.actif ? 'success' : 'default'
+                    });
+                    statusTd.appendChild(statusBadge);
+                    row.appendChild(statusTd);
+
+                    const actionTd = document.createElement('td');
+                    actionTd.className = 'px-4 py-3 text-right';
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'text-red-500 hover:text-red-700 font-bold text-lg px-2';
+                    removeBtn.title = 'Retirer de ce rôle';
+                    removeBtn.textContent = '×';
+                    removeBtn.addEventListener('click', () => handleRemoveMember(user.id));
+                    actionTd.appendChild(removeBtn);
+                    row.appendChild(actionTd);
+
+                    tbody.appendChild(row);
+                });
+                table.appendChild(tbody);
+                body.appendChild(table);
+
+                // Pagination utilisateurs
+                if (totalUserPages > 1) {
+                    const pagDiv = document.createElement('div');
+                    pagDiv.className = 'flex items-center justify-between mt-4 text-sm text-gray-600';
+
+                    const info = document.createElement('span');
+                    const start = (detailUserPage - 1) * detailUserPerPage + 1;
+                    const end = Math.min(detailUserPage * detailUserPerPage, detailUsers.length);
+                    info.textContent = `${start}-${end} sur ${detailUsers.length}`;
+
+                    const nav = document.createElement('div');
+                    nav.className = 'flex gap-2';
+
+                    const prevBtn = Button({
+                        text: '←',
+                        variant: 'secondary',
+                        disabled: detailUserPage === 1,
+                        onClick: () => { detailUserPage--; render(); }
+                    });
+                    const nextBtn = Button({
+                        text: '→',
+                        variant: 'secondary',
+                        disabled: detailUserPage === totalUserPages,
+                        onClick: () => { detailUserPage++; render(); }
+                    });
+
+                    nav.appendChild(prevBtn);
+                    nav.appendChild(nextBtn);
+                    pagDiv.appendChild(info);
+                    pagDiv.appendChild(nav);
+                    body.appendChild(pagDiv);
+                }
+            }
+
+        } else {
+            // ---- Onglet Permissions -----------------------------------------
+            const perms = detailRole.permissions || [];
+
+            if (perms.length === 0) {
+                const empty = document.createElement('p');
+                empty.className = 'text-center text-gray-500 py-10';
+                empty.textContent = 'Aucune permission assignée à ce rôle.';
+                body.appendChild(empty);
+            } else {
+                // Bouton retrait groupé
+                if (selectedDetailPermIds.size > 0) {
+                    const bulkBtn = Button({
+                        text: `Retirer la sélection (${selectedDetailPermIds.size})`,
+                        variant: 'danger',
+                        onClick: handleBulkRemovePermissions
+                    });
+                    bulkBtn.className += ' mb-4';
+                    body.appendChild(bulkBtn);
+                }
+
+                const table = document.createElement('table');
+                table.className = 'min-w-full divide-y divide-gray-200 text-sm';
+
+                const thead = document.createElement('thead');
+                thead.className = 'bg-gray-50';
+                const headerRow = document.createElement('tr');
+
+                // Select-all
+                const checkAllTh = document.createElement('th');
+                checkAllTh.className = 'px-3 py-2 w-8';
+                const checkAll = document.createElement('input');
+                checkAll.type = 'checkbox';
+                checkAll.className = 'rounded border-gray-300';
+                const allPermIds = perms.map(p => p.id);
+                checkAll.checked = allPermIds.length > 0 && allPermIds.every(id => selectedDetailPermIds.has(id));
+                checkAll.indeterminate = allPermIds.some(id => selectedDetailPermIds.has(id)) && !checkAll.checked;
+                checkAll.addEventListener('change', () => {
+                    if (checkAll.checked) allPermIds.forEach(id => selectedDetailPermIds.add(id));
+                    else allPermIds.forEach(id => selectedDetailPermIds.delete(id));
+                    render();
+                });
+                checkAllTh.appendChild(checkAll);
+                headerRow.appendChild(checkAllTh);
+
+                ['Nom', 'Action', 'Description', ''].forEach(text => {
+                    const th = document.createElement('th');
+                    th.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase';
+                    th.textContent = text;
+                    headerRow.appendChild(th);
+                });
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
+
+                const tbody = document.createElement('tbody');
+                tbody.className = 'bg-white divide-y divide-gray-100';
+
+                perms.forEach(perm => {
+                    const row = document.createElement('tr');
+                    row.className = selectedDetailPermIds.has(perm.id) ? 'bg-blue-50' : 'hover:bg-gray-50';
+
+                    const checkTd = document.createElement('td');
+                    checkTd.className = 'px-3 py-3';
+                    const cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.className = 'rounded border-gray-300';
+                    cb.checked = selectedDetailPermIds.has(perm.id);
+                    cb.addEventListener('change', () => {
+                        if (cb.checked) selectedDetailPermIds.add(perm.id);
+                        else selectedDetailPermIds.delete(perm.id);
+                        render();
+                    });
+                    checkTd.appendChild(cb);
+                    row.appendChild(checkTd);
+
+                    const nomTd = document.createElement('td');
+                    nomTd.className = 'px-4 py-3 font-medium text-gray-900';
+                    nomTd.textContent = perm.nom;
+                    row.appendChild(nomTd);
+
+                    const actionTdBadge = document.createElement('td');
+                    actionTdBadge.className = 'px-4 py-3';
+                    actionTdBadge.appendChild(Badge({ text: perm.action, variant: 'info' }));
+                    row.appendChild(actionTdBadge);
+
+                    const descTd = document.createElement('td');
+                    descTd.className = 'px-4 py-3 text-gray-500 text-xs max-w-xs truncate';
+                    descTd.textContent = perm.description || '-';
+                    row.appendChild(descTd);
+
+                    const actionTd = document.createElement('td');
+                    actionTd.className = 'px-4 py-3 text-right';
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'text-red-500 hover:text-red-700 font-bold text-lg px-2';
+                    removeBtn.title = 'Retirer de ce rôle';
+                    removeBtn.textContent = '×';
+                    removeBtn.addEventListener('click', () => handleRemovePermission(perm.id));
+                    actionTd.appendChild(removeBtn);
+                    row.appendChild(actionTd);
+
+                    tbody.appendChild(row);
+                });
+                table.appendChild(tbody);
+                body.appendChild(table);
+            }
+        }
+
+        panel.appendChild(body);
+        return overlay;
     }
 
     // ========================================================================
@@ -656,6 +1194,7 @@ export default function AdminRolesPage() {
         }
 
         if (showModal) container.appendChild(renderModal());
+        if (showDetailModal) container.appendChild(renderDetailModal());
     }
 
     // ========================================================================

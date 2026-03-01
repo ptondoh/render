@@ -14,7 +14,7 @@ from backend.models import (
     MessageResponse
 )
 from backend.middleware.security import get_current_user
-from backend.middleware.rbac import require_role
+from backend.middleware.rbac import require_role, require_permission
 from backend.database import db
 
 router = APIRouter(prefix="/api", tags=["Territoires"])
@@ -97,7 +97,7 @@ async def get_departement(
 )
 async def create_departement(
     departement: DepartementCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:departements"))
 ):
     """
     Créer un nouveau département.
@@ -132,7 +132,7 @@ async def create_departement(
 async def update_departement(
     departement_id: str,
     departement: DepartementCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:departements"))
 ):
     """
     Mettre à jour un département.
@@ -178,7 +178,7 @@ async def update_departement(
 @router.delete("/departements/{departement_id}", response_model=MessageResponse)
 async def delete_departement(
     departement_id: str,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:departements"))
 ):
     """
     Supprimer (désactiver) un département.
@@ -326,7 +326,7 @@ async def get_commune(
 )
 async def create_commune(
     commune: CommuneCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:communes"))
 ):
     """
     Créer une nouvelle commune.
@@ -379,7 +379,7 @@ async def create_commune(
 async def update_commune(
     commune_id: str,
     commune: CommuneCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:communes"))
 ):
     """
     Mettre à jour une commune.
@@ -443,7 +443,7 @@ async def update_commune(
 @router.delete("/communes/{commune_id}", response_model=MessageResponse)
 async def delete_commune(
     commune_id: str,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("admin:communes"))
 ):
     """
     Supprimer (désactiver) une commune.

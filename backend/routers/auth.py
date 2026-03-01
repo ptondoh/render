@@ -233,6 +233,19 @@ async def login(credentials: LoginRequest, request: Request):
             detail="Compte désactivé"
         )
 
+    # Vérifier que l'utilisateur a au moins un rôle
+    if not user_doc.get("roles"):
+        await log_auth_attempt(
+            email=credentials.email,
+            success=False,
+            ip_address=ip_address,
+            reason="Aucun rôle assigné"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Votre compte n'a pas de rôle assigné. Veuillez contacter l'administrateur."
+        )
+
     user = UserInDB(**user_doc)
 
     # Déterminer la méthode de 2e facteur

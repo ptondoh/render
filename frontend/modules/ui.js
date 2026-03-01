@@ -220,7 +220,7 @@ export function Modal({ title, content, onClose, footer, className = '', isOpen,
 /**
  * Composant Toast (notification)
  */
-export function showToast({ message, type = 'info', duration = 3000 }) {
+export function showToast({ message, type = 'info', duration = 3000, persistent = false }) {
     const typeClasses = {
         success: 'bg-green-500',
         error: 'bg-red-500',
@@ -228,25 +228,39 @@ export function showToast({ message, type = 'info', duration = 3000 }) {
         info: 'bg-blue-500',
     };
 
+    // Les warnings et erreurs sont persistants par défaut (doivent être fermés manuellement)
+    const isPersistent = persistent || type === 'warning' || type === 'error';
+
     const toast = createElement('div', {
-        className: `${typeClasses[type]} text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2 animate-slide-in`,
+        className: `${typeClasses[type]} text-white px-4 py-3 rounded-lg shadow-lg flex items-center space-x-2 animate-slide-in max-w-lg`,
     });
 
     const icon = getToastIcon(type);
     if (icon) toast.appendChild(icon);
 
-    const text = createElement('span', {}, message);
+    const text = createElement('span', { className: 'flex-1 text-sm' }, message);
     toast.appendChild(text);
+
+    // Bouton de fermeture (toujours visible)
+    const closeBtn = createElement('button', {
+        className: 'ml-3 text-white opacity-75 hover:opacity-100 font-bold text-lg leading-none flex-shrink-0',
+        style: 'background:none;border:none;cursor:pointer;padding:0 4px;',
+    }, '×');
+    const dismissToast = () => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => toast.remove(), 300);
+    };
+    closeBtn.addEventListener('click', dismissToast);
+    toast.appendChild(closeBtn);
 
     const container = document.getElementById('toast-container');
     container.appendChild(toast);
 
-    // Auto-remove après duration
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(() => toast.remove(), 300);
-    }, duration);
+    // Auto-remove uniquement si non persistant
+    if (!isPersistent) {
+        setTimeout(dismissToast, duration);
+    }
 }
 
 function getToastIcon(type) {

@@ -46,6 +46,9 @@ export default function AdminCommunesPage() {
     let itemsPerPage = 10;
     let totalPages = 1;
 
+    // Sélection (suppression en lot)
+    let selectedIds = new Set();
+
     // Formulaire
     let formData = {
         code: '',
@@ -73,6 +76,18 @@ export default function AdminCommunesPage() {
         titleDiv.appendChild(title);
         titleDiv.appendChild(subtitle);
 
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'flex items-center gap-3';
+
+        if (selectedIds.size > 0) {
+            const bulkDeleteBtn = Button({
+                text: `Supprimer la sélection (${selectedIds.size})`,
+                variant: 'danger',
+                onClick: handleBulkDelete
+            });
+            buttonsDiv.appendChild(bulkDeleteBtn);
+        }
+
         const addButton = Button({
             text: '+ Ajouter une commune',
             variant: 'primary',
@@ -91,8 +106,9 @@ export default function AdminCommunesPage() {
             }
         });
 
+        buttonsDiv.appendChild(addButton);
         header.appendChild(titleDiv);
-        header.appendChild(addButton);
+        header.appendChild(buttonsDiv);
 
         return header;
     }
@@ -281,6 +297,31 @@ export default function AdminCommunesPage() {
             return th;
         };
 
+        // Pagination
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const paginatedCommunes = filteredCommunes.slice(startIndex, endIndex);
+
+        // Checkbox "tout sélectionner"
+        const checkAllTh = document.createElement('th');
+        checkAllTh.className = 'px-4 py-3 w-10';
+        const checkAll = document.createElement('input');
+        checkAll.type = 'checkbox';
+        checkAll.className = 'w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer';
+        const pageIds = paginatedCommunes.map(c => c.id);
+        checkAll.checked = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+        checkAll.indeterminate = pageIds.some(id => selectedIds.has(id)) && !checkAll.checked;
+        checkAll.addEventListener('change', () => {
+            if (checkAll.checked) {
+                pageIds.forEach(id => selectedIds.add(id));
+            } else {
+                pageIds.forEach(id => selectedIds.delete(id));
+            }
+            render();
+        });
+        checkAllTh.appendChild(checkAll);
+        headerRow.appendChild(checkAllTh);
+
         headerRow.appendChild(createSortableHeader('Code', 'code'));
         headerRow.appendChild(createSortableHeader('Nom', 'nom'));
 
@@ -311,14 +352,29 @@ export default function AdminCommunesPage() {
         const tbody = document.createElement('tbody');
         tbody.className = 'bg-white divide-y divide-gray-200';
 
-        // Pagination
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        const paginatedCommunes = filteredCommunes.slice(startIndex, endIndex);
-
         paginatedCommunes.forEach(commune => {
             const row = document.createElement('tr');
-            row.className = 'hover:bg-gray-50';
+            row.className = selectedIds.has(commune.id)
+                ? 'bg-blue-50'
+                : 'hover:bg-gray-50';
+
+            // Checkbox de sélection
+            const checkCell = document.createElement('td');
+            checkCell.className = 'px-4 py-4 w-10';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer';
+            checkbox.checked = selectedIds.has(commune.id);
+            checkbox.addEventListener('change', () => {
+                if (checkbox.checked) {
+                    selectedIds.add(commune.id);
+                } else {
+                    selectedIds.delete(commune.id);
+                }
+                render();
+            });
+            checkCell.appendChild(checkbox);
+            row.appendChild(checkCell);
 
             // Code
             const codeCell = document.createElement('td');
@@ -630,6 +686,32 @@ export default function AdminCommunesPage() {
         };
         showModal = true;
         render();
+    }
+
+    async function handleBulkDelete() {
+        const count = selectedIds.size;
+        if (!confirm(`Êtes-vous sûr de vouloir supprimer ${count} commune(s) sélectionnée(s) ?\n\nLes communes ayant des marchés seront ignorées.`)) {
+            return;
+        }
+
+        try {
+            const result = await api.delete('/api/communes', { ids: Array.from(selectedIds) });
+            const msg = result.message || `${result.deleted_count} commune(s) supprimée(s)`;
+            showToast({ message: msg, type: result.deleted_count > 0 ? 'success' : 'warning' });
+            if (result.skipped && result.skipped.length > 0) {
+                showToast({
+                    message: `Ignorées (ont des marchés) : ${result.skipped.join(', ')}`,
+                    type: 'warning'
+                });
+            }
+            selectedIds.clear();
+            await loadCommunes();
+        } catch (error) {
+            showToast({
+                message: error.message || 'Erreur lors de la suppression en lot',
+                type: 'error'
+            });
+        }
     }
 
     async function handleDelete(commune) {

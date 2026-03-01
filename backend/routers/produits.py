@@ -13,7 +13,7 @@ from backend.models import (
     MessageResponse
 )
 from backend.middleware.security import get_current_user
-from backend.middleware.rbac import require_role
+from backend.middleware.rbac import require_role, require_permission
 from backend.database import db
 
 router = APIRouter(prefix="/api/produits", tags=["Produits"])
@@ -137,7 +137,7 @@ async def get_produit(
 )
 async def create_produit(
     produit: ProduitCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("produits:create"))
 ):
     """
     Créer un nouveau produit.
@@ -209,7 +209,7 @@ async def create_produit(
 async def update_produit(
     produit_id: str,
     produit: ProduitCreate,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("produits:update"))
 ):
     """
     Mettre à jour un produit.
@@ -299,7 +299,7 @@ async def update_produit(
 @router.delete("/{produit_id}", response_model=MessageResponse)
 async def delete_produit(
     produit_id: str,
-    current_user: dict = Depends(require_role(["décideur"]))
+    current_user: dict = Depends(require_permission("produits:delete"))
 ):
     """
     Supprimer (désactiver) un produit.

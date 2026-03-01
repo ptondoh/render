@@ -568,7 +568,7 @@ export default function AdminPermissionsPage() {
 
     async function handleBulkDelete() {
         const count = selectedIds.size;
-        if (!confirm(`Êtes-vous sûr de vouloir supprimer ${count} permission(s) sélectionnée(s) ?\n\nLes permissions utilisées par des rôles seront ignorées.`)) {
+        if (!confirm(`Êtes-vous sûr de vouloir supprimer ${count} permission(s) sélectionnée(s) ?\n\nLes permissions utilisées par des rôles seront automatiquement détachées puis supprimées.`)) {
             return;
         }
 
@@ -576,12 +576,6 @@ export default function AdminPermissionsPage() {
             const result = await api.delete('/api/permissions', { ids: Array.from(selectedIds) });
             const msg = result.message || `${result.deleted_count} permission(s) supprimée(s)`;
             showToast({ message: msg, type: result.deleted_count > 0 ? 'success' : 'warning' });
-            if (result.skipped_roles && result.skipped_roles.length > 0) {
-                showToast({
-                    message: `Ignorées (utilisées par des rôles) : ${result.skipped_roles.join(', ')}`,
-                    type: 'warning'
-                });
-            }
             selectedIds.clear();
             await loadPermissions();
         } catch (error) {
