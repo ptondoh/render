@@ -19,6 +19,16 @@ from backend.database import db
 router = APIRouter(prefix="/api/collectes", tags=["Collectes de Prix"])
 
 
+def _oid(value) -> ObjectId | None:
+    """Convertit une valeur en ObjectId de façon sécurisée (retourne None si invalide)."""
+    if not value:
+        return None
+    try:
+        return ObjectId(value) if ObjectId.is_valid(str(value)) else None
+    except Exception:
+        return None
+
+
 @router.get("", response_model=List[CollecteResponse])
 async def get_collectes(
     marche_id: Optional[str] = Query(None, description="Filtrer par marché"),
@@ -79,35 +89,43 @@ async def get_collectes(
     # Enrichir les données avec les noms
     result = []
     for collecte in collectes:
-        # Récupérer les données associées
-        marche = await db.marches.find_one({"_id": ObjectId(collecte["marche_id"])})
-        commune = await db.communes.find_one({"_id": ObjectId(marche["commune_id"])}) if marche and marche.get("commune_id") else None
-        produit = await db.produits.find_one({"_id": ObjectId(collecte["produit_id"])})
-        unite = await db.unites_mesure.find_one({"_id": ObjectId(collecte["unite_id"])}) if collecte.get("unite_id") else None
-        agent = await db.users.find_one({"_id": ObjectId(collecte["agent_id"])})
+        try:
+            marche_oid = _oid(collecte.get("marche_id"))
+            marche = await db.marches.find_one({"_id": marche_oid}) if marche_oid else None
+            commune_oid = _oid(marche.get("commune_id")) if marche else None
+            commune = await db.communes.find_one({"_id": commune_oid}) if commune_oid else None
+            produit_oid = _oid(collecte.get("produit_id"))
+            produit = await db.produits.find_one({"_id": produit_oid}) if produit_oid else None
+            unite_oid = _oid(collecte.get("unite_id"))
+            unite = await db.unites_mesure.find_one({"_id": unite_oid}) if unite_oid else None
+            agent_oid = _oid(collecte.get("agent_id"))
+            agent = await db.users.find_one({"_id": agent_oid}) if agent_oid else None
 
-        result.append(CollecteResponse(
-            id=str(collecte["_id"]),
-            marche_id=collecte["marche_id"],
-            produit_id=collecte["produit_id"],
-            unite_id=collecte.get("unite_id", ""),
-            quantite=collecte.get("quantite", 1),
-            prix=collecte["prix"],
-            date=collecte["date"],
-            periode=collecte.get("periode"),
-            commentaire=collecte.get("commentaire"),
-            image=collecte.get("image"),
-            agent_id=collecte["agent_id"],
-            statut=collecte["statut"],
-            latitude=collecte.get("latitude"),
-            longitude=collecte.get("longitude"),
-            created_at=collecte["created_at"],
-            marche_nom=marche.get("nom") if marche else None,
-            commune_nom=commune.get("nom") if commune else None,
-            produit_nom=produit.get("nom") if produit else None,
-            unite_nom=unite.get("unite") if unite else None,
-            agent_nom=f"{agent.get('prenom', '')} {agent.get('nom', '')}".strip() if agent else None
-        ))
+            result.append(CollecteResponse(
+                id=str(collecte["_id"]),
+                marche_id=collecte.get("marche_id", ""),
+                produit_id=collecte.get("produit_id", ""),
+                unite_id=collecte.get("unite_id", ""),
+                quantite=collecte.get("quantite", 1),
+                prix=collecte.get("prix", 0),
+                date=collecte.get("date", datetime.utcnow()),
+                periode=collecte.get("periode"),
+                commentaire=collecte.get("commentaire"),
+                image=collecte.get("image"),
+                agent_id=collecte.get("agent_id", ""),
+                statut=collecte.get("statut", "soumise"),
+                latitude=collecte.get("latitude"),
+                longitude=collecte.get("longitude"),
+                created_at=collecte.get("created_at", datetime.utcnow()),
+                marche_nom=marche.get("nom") if marche else None,
+                commune_nom=commune.get("nom") if commune else None,
+                produit_nom=produit.get("nom") if produit else None,
+                unite_nom=unite.get("unite") if unite else None,
+                agent_nom=f"{agent.get('prenom', '')} {agent.get('nom', '')}".strip() if agent else None
+            ))
+        except Exception:
+            # Ignorer les collectes avec des données corrompues
+            continue
 
     return result
 
@@ -141,27 +159,32 @@ async def get_collecte(
         )
 
     # Enrichir avec les noms
-    marche = await db.marches.find_one({"_id": ObjectId(collecte["marche_id"])})
-    commune = await db.communes.find_one({"_id": ObjectId(marche["commune_id"])}) if marche and marche.get("commune_id") else None
-    produit = await db.produits.find_one({"_id": ObjectId(collecte["produit_id"])})
-    unite = await db.unites_mesure.find_one({"_id": ObjectId(collecte["unite_id"])}) if collecte.get("unite_id") else None
-    agent = await db.users.find_one({"_id": ObjectId(collecte["agent_id"])})
+    marche_oid = _oid(collecte.get("marche_id"))
+    marche = await db.marches.find_one({"_id": marche_oid}) if marche_oid else None
+    commune_oid = _oid(marche.get("commune_id")) if marche else None
+    commune = await db.communes.find_one({"_id": commune_oid}) if commune_oid else None
+    produit_oid = _oid(collecte.get("produit_id"))
+    produit = await db.produits.find_one({"_id": produit_oid}) if produit_oid else None
+    unite_oid = _oid(collecte.get("unite_id"))
+    unite = await db.unites_mesure.find_one({"_id": unite_oid}) if unite_oid else None
+    agent_oid = _oid(collecte.get("agent_id"))
+    agent = await db.users.find_one({"_id": agent_oid}) if agent_oid else None
 
     return CollecteResponse(
         id=str(collecte["_id"]),
-        marche_id=collecte["marche_id"],
-        produit_id=collecte["produit_id"],
+        marche_id=collecte.get("marche_id", ""),
+        produit_id=collecte.get("produit_id", ""),
         unite_id=collecte.get("unite_id", ""),
         quantite=collecte.get("quantite", 1),
-        prix=collecte["prix"],
-        date=collecte["date"],
+        prix=collecte.get("prix", 0),
+        date=collecte.get("date", datetime.utcnow()),
         periode=collecte.get("periode"),
         commentaire=collecte.get("commentaire"),
-        agent_id=collecte["agent_id"],
-        statut=collecte["statut"],
+        agent_id=collecte.get("agent_id", ""),
+        statut=collecte.get("statut", "soumise"),
         latitude=collecte.get("latitude"),
         longitude=collecte.get("longitude"),
-        created_at=collecte["created_at"],
+        created_at=collecte.get("created_at", datetime.utcnow()),
         marche_nom=marche.get("nom") if marche else None,
         commune_nom=commune.get("nom") if commune else None,
         produit_nom=produit.get("nom") if produit else None,
