@@ -29,6 +29,53 @@ def _oid(value) -> ObjectId | None:
         return None
 
 
+def _float(value, default: float = 0.0) -> float:
+    """Convertit une valeur en float (gère bson.Decimal128 et autres types)."""
+    if value is None:
+        return default
+    try:
+        return float(str(value)) if hasattr(value, 'to_decimal') else float(value)
+    except Exception:
+        return default
+
+
+def _build_collecte_response(collecte, marche, commune, produit, unite, agent) -> CollecteResponse:
+    """Construit un CollecteResponse de façon robuste depuis un document MongoDB."""
+    quantite = max(_float(collecte.get("quantite"), 1.0), 0.001)  # gt=0 required
+    prix = _float(collecte.get("prix"), 0.0)
+
+    date_val = collecte.get("date")
+    if not isinstance(date_val, datetime):
+        date_val = datetime.utcnow()
+
+    created_val = collecte.get("created_at")
+    if not isinstance(created_val, datetime):
+        created_val = datetime.utcnow()
+
+    return CollecteResponse(
+        id=str(collecte["_id"]),
+        marche_id=str(collecte.get("marche_id", "")),
+        produit_id=str(collecte.get("produit_id", "")),
+        unite_id=str(collecte.get("unite_id", "")),
+        quantite=quantite,
+        prix=prix,
+        date=date_val,
+        periode=str(collecte["periode"]) if collecte.get("periode") else None,
+        commentaire=collecte.get("commentaire"),
+        image=collecte.get("image"),
+        agent_id=str(collecte.get("agent_id", "")),
+        statut=str(collecte.get("statut", "soumise")),
+        latitude=_float(collecte.get("latitude")) if collecte.get("latitude") is not None else None,
+        longitude=_float(collecte.get("longitude")) if collecte.get("longitude") is not None else None,
+        created_at=created_val,
+        marche_nom=marche.get("nom") if marche else None,
+        commune_nom=commune.get("nom") if commune else None,
+        produit_nom=produit.get("nom") if produit else None,
+        unite_nom=unite.get("unite") if unite else None,
+        agent_nom=f"{agent.get('prenom', '')} {agent.get('nom', '')}".strip() if agent else None
+    )
+
+
 @router.get("", response_model=List[CollecteResponse])
 async def get_collectes(
     marche_id: Optional[str] = Query(None, description="Filtrer par marché"),
@@ -100,31 +147,8 @@ async def get_collectes(
             unite = await db.unites_mesure.find_one({"_id": unite_oid}) if unite_oid else None
             agent_oid = _oid(collecte.get("agent_id"))
             agent = await db.users.find_one({"_id": agent_oid}) if agent_oid else None
-
-            result.append(CollecteResponse(
-                id=str(collecte["_id"]),
-                marche_id=collecte.get("marche_id", ""),
-                produit_id=collecte.get("produit_id", ""),
-                unite_id=collecte.get("unite_id", ""),
-                quantite=collecte.get("quantite", 1),
-                prix=collecte.get("prix", 0),
-                date=collecte.get("date", datetime.utcnow()),
-                periode=collecte.get("periode"),
-                commentaire=collecte.get("commentaire"),
-                image=collecte.get("image"),
-                agent_id=collecte.get("agent_id", ""),
-                statut=collecte.get("statut", "soumise"),
-                latitude=collecte.get("latitude"),
-                longitude=collecte.get("longitude"),
-                created_at=collecte.get("created_at", datetime.utcnow()),
-                marche_nom=marche.get("nom") if marche else None,
-                commune_nom=commune.get("nom") if commune else None,
-                produit_nom=produit.get("nom") if produit else None,
-                unite_nom=unite.get("unite") if unite else None,
-                agent_nom=f"{agent.get('prenom', '')} {agent.get('nom', '')}".strip() if agent else None
-            ))
+            result.append(_build_collecte_response(collecte, marche, commune, produit, unite, agent))
         except Exception:
-            # Ignorer les collectes avec des données corrompues
             continue
 
     return result
@@ -170,27 +194,7 @@ async def get_collecte(
     agent_oid = _oid(collecte.get("agent_id"))
     agent = await db.users.find_one({"_id": agent_oid}) if agent_oid else None
 
-    return CollecteResponse(
-        id=str(collecte["_id"]),
-        marche_id=collecte.get("marche_id", ""),
-        produit_id=collecte.get("produit_id", ""),
-        unite_id=collecte.get("unite_id", ""),
-        quantite=collecte.get("quantite", 1),
-        prix=collecte.get("prix", 0),
-        date=collecte.get("date", datetime.utcnow()),
-        periode=collecte.get("periode"),
-        commentaire=collecte.get("commentaire"),
-        agent_id=collecte.get("agent_id", ""),
-        statut=collecte.get("statut", "soumise"),
-        latitude=collecte.get("latitude"),
-        longitude=collecte.get("longitude"),
-        created_at=collecte.get("created_at", datetime.utcnow()),
-        marche_nom=marche.get("nom") if marche else None,
-        commune_nom=commune.get("nom") if commune else None,
-        produit_nom=produit.get("nom") if produit else None,
-        unite_nom=unite.get("unite") if unite else None,
-        agent_nom=f"{agent.get('prenom', '')} {agent.get('nom', '')}".strip() if agent else None
-    )
+    return _build_collecte_response(collecte, marche, commune, produit, unite, agent)
 
 
 @router.post("", response_model=CollecteResponse, status_code=status.HTTP_201_CREATED)
