@@ -1,7 +1,7 @@
 # 📊 PROGRESS.md - Avancement du Projet SAP
 
-> **Dernière mise à jour :** 2026-03-02
-> **Version :** 0.4
+> **Dernière mise à jour :** 2026-03-03
+> **Version :** 0.5
 > **Branche principale :** refactor-stack-minimaliste
 
 ---
@@ -136,6 +136,13 @@ Accessibles uniquement aux utilisateurs avec le rôle **bailleur**.
    - Gestion centralisée
    - Tri : Code, Nom, Communes
 
+#### Menu Administration ✨ UPDATED v0.5
+- **Icônes emoji** sur chaque élément du menu (desktop + mobile)
+- **Ordre alphabétique** au sein de chaque groupe
+- Groupe 1 (référentiels) : 📂 Catégories, 🏘️ Communes, 🗺️ Départements, 🏪 Marchés, 🛒 Produits, 📏 Unités
+- Groupe 2 (accès) : 🔑 Permissions, 🎭 Rôles, 👥 Utilisateurs
+- Dernier : 📤 Import CSV/Excel
+
 #### Sécurité RBAC
 - Vérification du rôle `bailleur` sur chaque page
 - Message d'erreur si accès refusé : "Cette page est réservée aux administrateurs"
@@ -143,41 +150,56 @@ Accessibles uniquement aux utilisateurs avec le rôle **bailleur**.
 
 ---
 
-### 7. Import CSV/Excel (Admin) ✅
+### 7. Hub Import — Toutes entités (Admin) ✅ ✨ UPDATED v0.5
 
-#### Page dédiée (`/admin/import`)
+#### Architecture hub + pages dédiées (`/admin/import`)
 Accessible **uniquement aux administrateurs** (rôle `bailleur`).
 
-#### Fonctionnalités
-- **Téléchargement de templates**
-  - Template Excel (.xlsx) avec structure prédéfinie
-  - Template CSV avec en-têtes
-- **Zone de dépôt de fichiers**
-  - Drag & drop ou sélection de fichier
+La page Import est désormais un **hub d'importation universel** couvrant les 10 entités du système.
+
+#### Hub (`#/admin/import`)
+- Grille de **10 tuiles** avec emoji, nom et description courte
+- Clic sur une tuile → navigation vers `#/admin/import?entity=xxx`
+- Lien retour "← Import de données" sur chaque page entité (haut droite)
+
+#### Entités supportées
+| Entité | Endpoint template | Endpoint import |
+|--------|-------------------|-----------------|
+| 📊 Collectes de prix | `/api/collectes/import/template` | `/api/collectes/import` |
+| 🛒 Produits | `/api/import/produits/template` | `/api/import/produits` |
+| 📂 Catégories | `/api/import/categories/template` | `/api/import/categories` |
+| 📏 Unités de mesure | `/api/import/unites/template` | `/api/import/unites` |
+| 🏪 Marchés | `/api/import/marches/template` | `/api/import/marches` |
+| 🏘️ Communes | `/api/import/communes/template` | `/api/import/communes` |
+| 🗺️ Départements | `/api/import/departements/template` | `/api/import/departements` |
+| 👥 Utilisateurs | `/api/import/utilisateurs/template` | `/api/import/utilisateurs` |
+| 🎭 Rôles | `/api/import/roles/template` | `/api/import/roles` |
+| 🔑 Permissions | `/api/import/permissions/template` | `/api/import/permissions` |
+
+#### Fonctionnalités par page entité (étapes guidées)
+- **Étape 1** : Télécharger template CSV ou Excel (.xlsx)
+  - Templates générés dynamiquement (pandas + openpyxl)
+  - Feuille "Données" : en-tête + 2 lignes d'exemple
+  - Feuille "Instructions" : description de chaque colonne
+  - Data validation Excel pour les champs enum (type_zone, type_marche, actif, action)
+- **Étape 2** : Upload fichier (drag & drop ou sélection)
   - Support CSV et Excel
-  - Validation du format
-- **Aperçu avant import**
-  - Affichage des 20 premières lignes
-  - Vérification des données
-  - Bouton d'annulation disponible
-- **Import en masse**
-  - Création de collectes multiples en une seule opération
-  - Validation des données (marchés, produits, agents existants)
-  - Rapport détaillé après import (succès/erreurs)
-- **Instructions complètes**
-  - Format des données requis
-  - Exemples de valeurs
-  - Liste des périodes acceptées
+  - Aperçu CSV : 20 premières lignes en tableau
+  - Aperçu Excel : liste des colonnes attendues
+- **Étape 3** : Confirmer l'import
+  - Rapport visuel : compteurs créés / erreurs / total
+  - Liste détaillée des erreurs par numéro de ligne
+
+#### Backend — `import_referentiels.py` (nouveau router)
+- Résolution automatique des noms → IDs MongoDB (ex: `nom_categorie` → `id_categorie`)
+- Mots de passe utilisateurs hachés via `pwd_context` (bcrypt)
+- Champs multi-valeurs séparés par `;` (ex: `noms_permissions`, `noms_roles`)
+- Réponse uniforme : `{ message, total_lignes, crees, erreurs: [{ligne, message}] }`
 
 #### Accès
-- **Dashboard** : Tuile dédiée "Import CSV/Excel" 📊
-- **Menu Administration** : Lien dans le dropdown
-- **URL directe** : `#/admin/import`
-
-#### Sécurité
-- Vérification du rôle `bailleur` avant affichage
-- Message d'erreur si accès refusé : "Cette page est réservée aux administrateurs"
-- **Fonctionnalité retirée** de la vue agent (anciennement dans `/collectes`)
+- **Dashboard** : Tuile "📤 Import" (renommée)
+- **Menu Administration** : 📤 Import CSV/Excel (dernier élément)
+- **URL directe** : `#/admin/import` (hub) / `#/admin/import?entity=produits` (entité)
 
 ---
 

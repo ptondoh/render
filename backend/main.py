@@ -26,6 +26,7 @@ from backend.routers import (
     collectes as collectes_router,
     alertes as alertes_router,
     import_collectes as import_collectes_router,
+    import_referentiels as import_ref_router,
     dashboard as dashboard_router,
     users as users_router
 )
@@ -145,6 +146,7 @@ app.include_router(marches_router.router)
 app.include_router(collectes_router.router)
 app.include_router(alertes_router.router)
 app.include_router(import_collectes_router.router)
+app.include_router(import_ref_router.router)
 app.include_router(dashboard_router.router)
 app.include_router(users_router.router)
 

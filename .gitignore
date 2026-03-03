@@ -115,8 +115,6 @@ backend/test_*.py
 backend/fix_*.py
 backend/routers/nul
 
-# Frontend temporaires
-frontend/pages/admin-import.js
 
 # Claude Code
 #.claude/

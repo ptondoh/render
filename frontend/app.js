@@ -134,7 +134,7 @@ const routes = {
         }
     },
     '/admin/import': {
-        title: 'Import CSV/Excel - SAP',
+        title: 'Import - SAP',
         requireAuth: true,
         render: async () => {
             const { default: AdminImportPage } = await import('./pages/admin-import.js');
