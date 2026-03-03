@@ -1,7 +1,7 @@
 # 📊 PROGRESS.md - Avancement du Projet SAP
 
-> **Dernière mise à jour :** 2026-02-25
-> **Version :** 0.3
+> **Dernière mise à jour :** 2026-03-02
+> **Version :** 0.4
 > **Branche principale :** refactor-stack-minimaliste
 
 ---
@@ -277,7 +277,7 @@ Accessible **uniquement aux administrateurs** (rôle `bailleur`).
 
 ---
 
-### 9. Gestion des Utilisateurs Admin ✅ NEW (2026-02-25)
+### 9. Gestion des Utilisateurs Admin ✅ (2026-02-25)
 
 #### Page `/admin/utilisateurs`
 Accessible uniquement aux utilisateurs avec le rôle **bailleur**.
@@ -306,6 +306,104 @@ Accessible uniquement aux utilisateurs avec le rôle **bailleur**.
 - Impossible de se désactiver ou supprimer soi-même (HTTP 400)
 - Audit logging de toutes les opérations
 - Reset password efface le MFA (sécurité)
+
+---
+
+### 10. Panneau Détail des Rôles ✅ NEW (2026-03-02)
+
+#### Bouton "Détail" sur chaque rôle (`/admin/roles`)
+Accessible uniquement aux utilisateurs avec le rôle **bailleur**.
+
+- **Modal à deux onglets** (`max-w-3xl`) s'ouvrant au clic sur "Détail"
+- **Onglet Utilisateurs** :
+  - Liste paginée (10 par page) des utilisateurs ayant le rôle
+  - Colonne : Email | Nom Prénom | Statut | [×]
+  - Case à cocher par ligne + select-all (page courante)
+  - Bouton "Retirer la sélection (N)" si sélection active
+  - Bouton [×] individuel pour retrait immédiat
+- **Onglet Permissions** :
+  - Liste des permissions attachées au rôle (depuis `detailRole.permissions`)
+  - Colonne : Nom | Action | Description | [×]
+  - Case à cocher par ligne + select-all
+  - Bouton "Retirer la sélection (N)" si sélection active
+  - Bouton [×] individuel pour retrait immédiat
+- Mise à jour de la liste principale des rôles après chaque retrait
+
+#### Nouveaux endpoints backend (`referentiels.py`)
+- `GET /api/roles/{role_id}/members` — Liste des utilisateurs du rôle
+- `DELETE /api/roles/{role_id}/members` — Retirer des utilisateurs (body: `{user_ids: [...]}`)
+- `DELETE /api/roles/{role_id}/permissions` — Retirer des permissions (body: `{permission_ids: [...]}`)
+
+#### Modèles Pydantic ajoutés
+```python
+class RemoveMembersRequest(BaseModel):
+    user_ids: List[str]
+
+class RemovePermissionsFromRoleRequest(BaseModel):
+    permission_ids: List[str]
+```
+
+---
+
+### 11. Toasts Persistants (Erreurs & Avertissements) ✅ NEW (2026-03-02)
+
+- Les toasts de type `error` et `warning` sont désormais **persistants** (ne disparaissent pas automatiquement)
+- Un bouton **×** est toujours visible sur tous les toasts pour fermeture manuelle
+- Seuls les toasts `info` et `success` se ferment automatiquement (après `duration` ms)
+- Fichier modifié : `frontend/modules/ui.js` (fonction `showToast`)
+
+---
+
+### 12. Blocage Connexion Sans Rôle ✅ NEW (2026-03-02)
+
+#### Comportement
+- Si un compte existe mais n'a **aucun rôle** assigné, la connexion est refusée (HTTP 403)
+- Le message d'erreur s'affiche **en ligne** sous le formulaire (fond rouge) — pas en toast
+- Le toast d'erreur en double (anciennement dans `auth.js`) a été supprimé
+
+#### Backend (`auth.py`)
+```python
+if not user.get("roles"):
+    raise HTTPException(
+        status_code=403,
+        detail="Aucun rôle assigné. Contactez l'administrateur."
+    )
+```
+
+#### Frontend (`login.js`)
+- L'erreur 403 est capturée et affichée dans un `Alert` inline
+- Plus de `showToast` dans le catch de `auth.login()` (évite les doublons)
+
+---
+
+### 13. Multi-Sélection & Suppression en Lot ✅ NEW (2026-03-02)
+
+#### Page Permissions (`/admin/permissions`)
+- Colonne de cases à cocher sur chaque ligne
+- Case "select-all" dans l'en-tête du tableau (page courante)
+- Bouton "Supprimer la sélection (N)" visible si au moins 1 élément coché
+- Confirmation avant suppression en lot
+- Retrait propre des IDs supprimés de la liste locale
+
+#### Page Utilisateurs (`/admin/utilisateurs`)
+- Même mécanique de multi-sélection
+- Bouton "Désactiver la sélection (N)" pour soft-delete en lot
+
+---
+
+### 14. 3 Tuiles Admin sur le Dashboard Bailleur ✅ NEW (2026-03-02)
+
+Le dashboard affiche désormais 3 tuiles supplémentaires pour le rôle **bailleur** :
+
+| Tuile | Icône | Lien |
+|-------|-------|------|
+| Utilisateurs | 👥 | `#/admin/utilisateurs` |
+| Rôles | 🛡️ | `#/admin/roles` |
+| Permissions | 🔑 | `#/admin/permissions` |
+
+- Cliquer sur une tuile navigue vers la page admin correspondante
+- Tuiles affichées uniquement si `isBailleur` est vrai
+- Fichier modifié : `frontend/pages/dashboard.js`
 
 ---
 
@@ -597,6 +695,107 @@ return JSONResponse(status_code=500, content={...}, headers=headers)
 
 ---
 
+### Bug #10 : Modal Scroll Bloqué — Tailwind JIT max-h-[90vh] ✅
+**Date :** 2026-03-02
+**Symptôme :** Le modal du panneau détail des rôles n'était pas scrollable sur un contenu long
+
+**Cause :**
+```javascript
+// max-h-[90vh] est une classe Tailwind JIT arbitraire
+// Non générée par Tailwind si la chaîne n'est pas dans le HTML statique scannée
+className: 'max-h-[90vh] overflow-y-auto'  // → class non appliquée !
+```
+
+**Solution :**
+```javascript
+// Appliquer le style directement en JS
+modal.style.maxHeight = '90vh';
+modal.style.overflowY = 'auto';
+```
+
+**Fichier modifié :** `frontend/pages/admin-roles.js`
+
+---
+
+### Bug #11 : `api.patch is not a function` ✅
+**Date :** 2026-03-02
+**Symptôme :** Erreur console lors du changement de méthode MFA ou d'autres appels PATCH
+
+**Cause :** La méthode `patch()` n'était pas définie dans `frontend/modules/api.js`
+
+**Solution :**
+```javascript
+// Ajout dans api.js
+patch: (endpoint, data) => request('PATCH', endpoint, data),
+```
+
+**Fichier modifié :** `frontend/modules/api.js`
+
+---
+
+### Bug #12 : Toast d'Erreur en Double à la Connexion ✅
+**Date :** 2026-03-02
+**Symptôme :** L'utilisateur voyait 2 messages d'erreur : un toast ET un message inline
+
+**Cause :**
+```javascript
+// Dans auth.js — appelé à chaque erreur de login
+showToast({ message: error.message, type: 'error' });  // toast #1
+
+// Dans login.js — affichage inline
+showAlert(error.message, 'error');  // message inline #2
+```
+
+**Solution :** Retrait du `showToast` dans le bloc catch de `auth.login()` dans `auth.js`.
+L'affichage inline de `login.js` suffit.
+
+**Fichier modifié :** `frontend/modules/auth.js`
+
+---
+
+### Bug #13 : `/api/collectes` — 500 en Production (Render) ✅
+**Date :** 2026-03-02
+**Symptôme :** L'API `/api/collectes` retournait HTTP 500 sur Render.com (production) alors qu'elle fonctionnait en local
+
+**Causes multiples :**
+1. `ObjectId(collecte["marche_id"])` lançait `bson.errors.InvalidId` pour les IDs invalides/manquants importés depuis la base locale
+2. Les champs `prix` et `quantite` stockés en `bson.Decimal128` n'étaient pas convertibles automatiquement par Pydantic en `float`
+3. La contrainte Pydantic `gt=0` sur `quantite` échouait si `quantite=0`
+4. Champs `date`/`created_at` manquants causaient des `KeyError`
+
+**Solution :**
+```python
+def _oid(value) -> ObjectId | None:
+    """Convertit en ObjectId de façon sécurisée."""
+    if not value:
+        return None
+    try:
+        return ObjectId(value) if ObjectId.is_valid(str(value)) else None
+    except Exception:
+        return None
+
+def _float(value, default: float = 0.0) -> float:
+    """Gère bson.Decimal128 et autres types non-float."""
+    if value is None:
+        return default
+    try:
+        return float(str(value)) if hasattr(value, 'to_decimal') else float(value)
+    except Exception:
+        return default
+
+def _build_collecte_response(...) -> CollecteResponse:
+    """Construit un CollecteResponse de façon robuste avec coercition de types."""
+    quantite = max(_float(collecte.get("quantite"), 1.0), 0.001)  # gt=0 garanti
+    # ... gestion datetime, None, etc.
+```
+- La boucle d'enrichissement dans `get_collectes()` est maintenant encadrée d'un `try/except/continue`
+
+**Note :** 155/160 collectes en production ont des `marche_id`/`produit_id`/`agent_id` invalides (IDs d'avant la réinitialisation de la DB). Seules 5 collectes avec références valides s'affichent. Les nouvelles collectes créées sur Vercel fonctionneront correctement.
+
+**Fichier modifié :** `backend/routers/collectes.py`
+
+---
+
 ## 🧪 Tests Effectués
 
 ### Tests Playwright (100% réussite — 99 passed, 7 skipped, 0 failed)
@@ -781,6 +980,8 @@ sap-minimaliste/
 │   │   ├── collectes.py         # Collectes de prix ⭐
 │   │   ├── alertes.py           # Système d'alertes
 │   │   ├── marches.py           # Gestion des marchés
+│   │   ├── referentiels.py      # Rôles, permissions, membres ⭐
+│   │   ├── users.py             # Gestion utilisateurs admin
 │   │   └── import_collectes.py  # Import CSV/Excel
 │   │
 │   ├── models.py                # Modèles Pydantic
@@ -813,7 +1014,10 @@ sap-minimaliste/
 │   │       ├── admin-marches.js
 │   │       ├── admin-communes.js
 │   │       ├── admin-departements.js
-│   │       └── admin-import.js      # Import CSV/Excel
+│   │       ├── admin-utilisateurs.js  # Gestion utilisateurs ⭐
+│   │       ├── admin-roles.js         # Gestion rôles + panneau détail ⭐
+│   │       ├── admin-permissions.js   # Gestion permissions + multi-select ⭐
+│   │       └── admin-import.js        # Import CSV/Excel
 │   │
 │   ├── modules/                 # Modules JS
 │   │   ├── auth.js              # Gestion auth
@@ -889,6 +1093,41 @@ mongod --dbpath C:\data\db
 ---
 
 ## 🔄 Dernières Modifications
+
+### 2026-03-02 — Panneau Détail Rôles, Toasts, RBAC Login, Fix Collectes
+```
+feat: Panneau détail rôles, toasts persistants, blocage sans rôle, fix collectes 500
+
+NOUVELLES FONCTIONNALITÉS :
+- Panneau Détail des Rôles (admin-roles.js) :
+  * Modal 2 onglets : Utilisateurs du rôle + Permissions du rôle
+  * Retrait individuel ([×]) et en lot (select-all + "Retirer la sélection")
+  * Pagination locale onglet Utilisateurs (10/page)
+  * 3 nouveaux endpoints : GET/DELETE /api/roles/{id}/members,
+    DELETE /api/roles/{id}/permissions
+- Toasts persistants pour type error/warning (bouton × toujours visible)
+- Blocage connexion si aucun rôle assigné (HTTP 403 + message inline)
+- Multi-sélection + suppression en lot sur /admin/permissions
+- 3 tuiles admin sur dashboard bailleur (Utilisateurs, Rôles, Permissions)
+
+CORRECTIONS :
+- Bug #10 : Modal scroll bloqué → style inline maxHeight/overflowY
+- Bug #11 : api.patch not a function → ajout patch() dans api.js
+- Bug #12 : Toast d'erreur en double à la connexion → retrait showToast auth.js
+- Bug #13 : /api/collectes 500 sur Render → helpers _oid(), _float(),
+  _build_collecte_response() + try/except/continue dans la boucle enrichissement
+
+FICHIERS MODIFIÉS :
+- backend/routers/referentiels.py (3 nouveaux endpoints + 2 modèles Pydantic)
+- backend/routers/collectes.py (helpers robustes pour production)
+- frontend/pages/admin-roles.js (panneau détail complet)
+- frontend/pages/admin-permissions.js (multi-sélection)
+- frontend/pages/dashboard.js (3 nouvelles tuiles bailleur)
+- frontend/modules/api.js (ajout patch())
+- frontend/modules/auth.js (retrait showToast en double)
+- frontend/modules/ui.js (toasts persistants error/warning)
+- frontend/pages/login.js (message inline erreur 403)
+```
 
 ### 2026-02-25 (session 2) — Playwright 100% + Fix MFA CORS
 ```
